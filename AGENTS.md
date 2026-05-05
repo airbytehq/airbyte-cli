@@ -105,6 +105,7 @@ The CLI uses a **resource-registry** pattern:
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--json` | Operation flag for inline JSON parameters; mutually exclusive with per-parameter flags | -- |
 | `--<param>` | Per-parameter operation flags generated from each scalar/array schema parameter, e.g. `--id`, `--workspace`, `--select-fields` | -- |
+| `--fields` | Client-side response filter (comma-separated dotted paths, e.g. `data.id,data.name`). Applied in `writeResult` after `Run`; bypasses error payloads. | -- |
 
 ## Credential Security
 

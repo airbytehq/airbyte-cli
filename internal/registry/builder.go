@@ -20,6 +20,7 @@ type flagAccessor interface {
 	GetFormat() string
 	GetOutput() string
 	GetDescribe() bool
+	GetFields() []string
 }
 
 func Build(rootCmd *cobra.Command, c *client.Client, flags flagAccessor) {
@@ -401,6 +402,9 @@ func handleRunError(err error) error {
 }
 
 func writeResult(result any, flags flagAccessor) error {
+	if fields := flags.GetFields(); len(fields) > 0 {
+		result = output.Filter(result, fields)
+	}
 	return output.Write(result, flags.GetFormat(), flags.GetOutput())
 }
 

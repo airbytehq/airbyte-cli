@@ -8,7 +8,9 @@ This document tells AI agents how to use the `airbyte` CLI. For development/arch
 > **Schema Discovery**: If you don't know the exact JSON payload structure for a command, run it with `--describe` first. This returns the parameter schema without executing the operation.
 
 > [!IMPORTANT]
-> **Context Window Protection**: Connector `execute` responses can be large. Use `select_fields` to limit response data, or `exclude_fields` to drop heavy columns. Never fetch all fields on a large dataset without filtering.
+> **Always filter responses to the fields you need.** Whenever you know which fields will satisfy the user's request, pass `--fields` to trim the output. This applies to **every command** — list, describe, execute, etc. Unfiltered responses waste context window and bandwidth on data you will discard anyway. The only time to skip the filter is when you genuinely need the full payload (e.g. one-shot debugging, or you don't yet know which fields exist — in which case run `--describe` or do a small probe call first).
+>
+> For row-level reads via `connectors execute`, also pass `select_fields` (API-side) to reduce upstream work. `select_fields` and `--fields` are complementary: the first stops the source connector from emitting columns you don't need; the second trims what the CLI prints to stdout.
 
 > [!IMPORTANT]
 > **Discover before executing**: Always run `connectors describe` before the first `execute` on any connector. Entity and action names vary by connector type and are not guessable.
@@ -37,6 +39,7 @@ airbyte <resource> <operation> --describe  # Show parameter schema
 | `--describe` | Print operation schema and exit (do not execute) | `false` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
+| `--fields` | Filter response to listed fields (comma-separated dotted paths, e.g. `data.id,data.name`). Client-side; not applied to errors. | -- |
 
 ## Usage Patterns
 

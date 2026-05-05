@@ -15,6 +15,24 @@ airbyte organizations list
 airbyte organizations list --format table
 ```
 
+## Filtering output
+
+> [!IMPORTANT]
+> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
+
+Use the global `--fields` flag to trim the response to specific fields. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
+
+```
+airbyte organizations list --fields id,organization_name              # short form
+airbyte organizations list --fields data.id,data.organization_name    # long form
+```
+
+If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
+
+```
+airbyte organizations list --fields data.id,next
+```
+
 ## When to use
 
 Most workflows do not need the organization ID directly — `workspace` is the primary identifier passed to other commands. Use this command when:
