@@ -26,7 +26,8 @@ func (a *authResource) Operations() []registry.Operation {
 				Params:      map[string]registry.ParamSchema{},
 			},
 			Hooks: registry.OperationHooks{
-				Interactive: authLoginInteractive,
+				Interactive:          authLoginInteractive,
+				AllowUnauthenticated: true,
 			},
 		},
 	}

@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/airbytehq/airbyte-cli/internal/auth"
@@ -28,6 +30,7 @@ type Client struct {
 	tokenManager   *auth.TokenManager
 	httpClient     *http.Client
 	debug          bool
+	debugFunc      func() bool
 }
 
 type Option func(*Client)
@@ -35,6 +38,12 @@ type Option func(*Client)
 func WithDebug(debug bool) Option {
 	return func(c *Client) {
 		c.debug = debug
+	}
+}
+
+func WithDebugFunc(debugFunc func() bool) Option {
+	return func(c *Client) {
+		c.debugFunc = debugFunc
 	}
 }
 
@@ -82,7 +91,11 @@ func (c *Client) Delete(ctx context.Context, path string) (json.RawMessage, erro
 }
 
 func (c *Client) GetURL(ctx context.Context, rawURL string) (json.RawMessage, error) {
-	return c.do(ctx, http.MethodGet, rawURL, nil)
+	safeURL, err := c.resolveAPIURL(rawURL)
+	if err != nil {
+		return nil, err
+	}
+	return c.do(ctx, http.MethodGet, safeURL, nil)
 }
 
 func (c *Client) doWithBody(ctx context.Context, method, path string, body any) (json.RawMessage, error) {
@@ -130,8 +143,8 @@ func (c *Client) do(ctx context.Context, method, rawURL string, body io.Reader) 
 			return nil, err
 		}
 
-		if c.debug {
-			log.Printf("[DEBUG] request %s %s attempt %d failed: %v", method, rawURL, attempt+1, err)
+		if c.isDebug() {
+			log.Printf("[DEBUG] request %s %s attempt %d failed: %s", method, redactURL(rawURL), attempt+1, debugError(err))
 		}
 	}
 
@@ -157,8 +170,8 @@ func (c *Client) doOnce(ctx context.Context, method, rawURL string, body io.Read
 		req.Header.Set("X-Organization-Id", c.organizationID)
 	}
 
-	if c.debug {
-		log.Printf("[DEBUG] %s %s", method, rawURL)
+	if c.isDebug() {
+		log.Printf("[DEBUG] %s %s", method, redactURL(rawURL))
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -172,8 +185,8 @@ func (c *Client) doOnce(ctx context.Context, method, rawURL string, body io.Read
 		return nil, false, fmt.Errorf("reading response body: %w", err)
 	}
 
-	if c.debug {
-		log.Printf("[DEBUG] response %d: %s", resp.StatusCode, string(respBody))
+	if c.isDebug() {
+		log.Printf("[DEBUG] response status=%d bytes=%d", resp.StatusCode, len(respBody))
 	}
 
 	if resp.StatusCode >= 400 {
@@ -187,6 +200,78 @@ func (c *Client) doOnce(ctx context.Context, method, rawURL string, body io.Read
 	}
 
 	return json.RawMessage(respBody), false, nil
+}
+
+func (c *Client) isDebug() bool {
+	return c.debug || (c.debugFunc != nil && c.debugFunc())
+}
+
+func (c *Client) resolveAPIURL(rawURL string) (string, error) {
+	apiBase, err := url.Parse(c.apiHost)
+	if err != nil {
+		return "", fmt.Errorf("parsing API host: %w", err)
+	}
+	nextURL, err := url.Parse(rawURL)
+	if err != nil {
+		return "", fmt.Errorf("parsing URL: %w", err)
+	}
+	if !nextURL.IsAbs() {
+		return apiBase.ResolveReference(nextURL).String(), nil
+	}
+	if nextURL.Scheme != apiBase.Scheme || nextURL.Host != apiBase.Host {
+		return "", &APIError{
+			Type:       "validation_error",
+			Message:    "pagination URL points outside the configured API host",
+			StatusCode: 400,
+		}
+	}
+	return nextURL.String(), nil
+}
+
+func redactURL(rawURL string) string {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+	q := u.Query()
+	for key := range q {
+		if isSensitiveKey(key) {
+			q.Set(key, "[REDACTED]")
+		}
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+func debugError(err error) string {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) {
+		return fmt.Sprintf("%s status=%d retryable=%t", apiErr.Type, apiErr.StatusCode, apiErr.Retryable)
+	}
+	return redactText(err.Error())
+}
+
+func redactText(s string) string {
+	parts := strings.Fields(s)
+	for i, part := range parts {
+		if strings.Contains(part, "=") {
+			key, _, _ := strings.Cut(part, "=")
+			if isSensitiveKey(strings.Trim(key, `"'`)) {
+				parts[i] = key + "=[REDACTED]"
+			}
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func isSensitiveKey(key string) bool {
+	key = strings.ToLower(key)
+	return strings.Contains(key, "token") ||
+		strings.Contains(key, "secret") ||
+		strings.Contains(key, "password") ||
+		strings.Contains(key, "credential") ||
+		strings.Contains(key, "api_key") ||
+		strings.Contains(key, "apikey")
 }
 
 func extractErrorMessage(body []byte, statusCode int) string {

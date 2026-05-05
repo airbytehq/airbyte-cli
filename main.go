@@ -17,7 +17,7 @@ func main() {
 	var c *client.Client
 	if creds, err := auth.ResolveCredentials(); err == nil {
 		tm := auth.NewTokenManager(cfg.APIHost, creds.OrganizationID, creds)
-		c = client.New(cfg.APIHost, creds.OrganizationID, cmd.Version, tm, client.WithDebug(cmd.GetVerbose()))
+		c = client.New(cfg.APIHost, creds.OrganizationID, cmd.Version, tm, client.WithDebugFunc(cmd.GetVerbose))
 	}
 
 	resources.RegisterAll()

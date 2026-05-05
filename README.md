@@ -98,7 +98,7 @@ Parameters can be supplied two ways: as a single JSON document via `--json`, or 
 
 ### Two ways to pass parameters
 
-**1. Individual flags (recommended for humans)** — every parameter in the operation's schema is exposed as a `--<param>` flag, with snake_case keys converted to kebab-case (e.g. `select_fields` → `--select-fields`):
+**1. Individual flags (recommended for humans)** — scalar and array parameters in the operation's schema are exposed as `--<param>` flags, with snake_case keys converted to kebab-case (e.g. `select_fields` → `--select-fields`):
 
 ```bash
 airbyte connectors describe --workspace default --name hubspot
@@ -123,11 +123,11 @@ airbyte connectors execute --json '{
 
 Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the only way to pass nested objects (e.g. the `params` field on `connectors execute`).
 
-### Global flags
+### Common flags
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `--json` | Inline JSON parameters (or `@filename` to load from a file). Cannot be combined with per-parameter flags. | -- |
+| `--json` | Operation flag for inline JSON parameters (or `@filename` to load from a file). Cannot be combined with per-parameter flags. | -- |
 | `--format` | Output format: `json` or `table` | `json` |
 | `--describe` | Print the operation's parameter schema and exit | `false` |
 | `--output, -o` | Write output to a file instead of stdout | -- |

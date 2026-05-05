@@ -3,6 +3,7 @@ package registry
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"sort"
@@ -53,6 +54,15 @@ type paramBinding struct {
 	sliceVal *[]string
 }
 
+var reservedFlagNames = map[string]bool{
+	"describe": true,
+	"format":   true,
+	"help":     true,
+	"json":     true,
+	"output":   true,
+	"verbose":  true,
+}
+
 // flagNameFor maps a snake_case schema key to a kebab-case CLI flag.
 func flagNameFor(schemaKey string) string {
 	return strings.ReplaceAll(schemaKey, "_", "-")
@@ -61,6 +71,7 @@ func flagNameFor(schemaKey string) string {
 func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cobra.Command {
 	var jsonInput string
 	bindings := map[string]*paramBinding{}
+	var buildErrors []string
 
 	cmd := &cobra.Command{
 		Use:   op.Name,
@@ -75,6 +86,13 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(buildErrors) > 0 {
+				return handleRunError(client.NewValidationError(
+					"operation schema has invalid parameter flags: "+strings.Join(buildErrors, "; "),
+					"rename conflicting schema parameters",
+				))
+			}
+
 			params, err := collectParams(cmd, jsonInput, bindings, op.Schema)
 			if err != nil {
 				return err
@@ -82,20 +100,20 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 
 			ctx := context.Background()
 
+			if c == nil && !op.Hooks.AllowUnauthenticated {
+				return handleRunError(&client.APIError{
+					Type:       "auth_error",
+					Message:    "no credentials configured: set AIRBYTE_CLIENT_ID and AIRBYTE_CLIENT_SECRET environment variables, or create ~/.airbyte/credentials",
+					StatusCode: 401,
+				})
+			}
+
 			if op.Hooks.Interactive != nil {
 				result, err := op.Hooks.Interactive(ctx, c, params)
 				if err != nil {
 					return handleRunError(err)
 				}
 				return writeResult(result, flags)
-			}
-
-			if c == nil {
-				return handleRunError(&client.APIError{
-					Type:       "auth_error",
-					Message:    "no credentials configured: set AIRBYTE_CLIENT_ID and AIRBYTE_CLIENT_SECRET environment variables, or create ~/.airbyte/credentials",
-					StatusCode: 401,
-				})
 			}
 
 			if op.Hooks.PreRun != nil {
@@ -130,7 +148,19 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 		if ps.Required {
 			desc += " (required)"
 		}
+		if !supportsFlagType(ps.Type) {
+			// "object" or unknown types have no flag form. Caller must use --json.
+			continue
+		}
 		b := &paramBinding{flagName: flagName, kind: ps.Type}
+		if reservedFlagNames[flagName] {
+			buildErrors = append(buildErrors, fmt.Sprintf("%q maps to reserved flag --%s", key, flagName))
+			continue
+		}
+		if existingKey, ok := flagKeyByName(bindings, flagName); ok {
+			buildErrors = append(buildErrors, fmt.Sprintf("%q and %q both map to --%s", existingKey, key, flagName))
+			continue
+		}
 		switch ps.Type {
 		case "string":
 			b.strVal = new(string)
@@ -147,14 +177,29 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 		case "array":
 			b.sliceVal = new([]string)
 			cmd.Flags().StringSliceVar(b.sliceVal, flagName, nil, desc+" (comma-separated, or repeat the flag)")
-		default:
-			// "object" or unknown types have no flag form — caller must use --json.
-			continue
 		}
 		bindings[key] = b
 	}
 
 	return cmd
+}
+
+func supportsFlagType(typ string) bool {
+	switch typ {
+	case "string", "bool", "boolean", "int", "integer", "number", "array":
+		return true
+	default:
+		return false
+	}
+}
+
+func flagKeyByName(bindings map[string]*paramBinding, flagName string) (string, bool) {
+	for key, b := range bindings {
+		if b.flagName == flagName {
+			return key, true
+		}
+	}
+	return "", false
 }
 
 // collectParams resolves the operation's parameters from either --json or the
@@ -172,7 +217,7 @@ func collectParams(cmd *cobra.Command, jsonInput string, bindings map[string]*pa
 
 	if jsonSet && len(setParamFlags) > 0 {
 		writeStderrJSON(map[string]any{
-			"error":   "validation_error",
+			"type":    "validation_error",
 			"message": fmt.Sprintf("--json cannot be combined with parameter flags (%s)", strings.Join(setParamFlags, ", ")),
 			"hint":    "pass parameters either as --json or as individual flags, not both",
 		})
@@ -238,20 +283,35 @@ func resolveJSONInput(input string) ([]byte, error) {
 }
 
 func validateParams(params map[string]any, schema OperationSchema) error {
-	missing := make(map[string]string)
-	for name, ps := range schema.Params {
-		if !ps.Required {
-			continue
-		}
-		if _, ok := params[name]; !ok {
-			missing[name] = "required"
+	fields := make(map[string]string)
+	for name := range params {
+		if _, ok := schema.Params[name]; !ok {
+			fields[name] = "unknown parameter"
 		}
 	}
 
-	if len(missing) > 0 {
+	for name, ps := range schema.Params {
+		value, ok := params[name]
+		if !ok {
+			if ps.Required {
+				fields[name] = "required"
+			}
+			continue
+		}
+
+		if ps.Required && isEmptyValue(value) {
+			fields[name] = "required"
+			continue
+		}
+		if msg := validateParamType(value, ps.Type); msg != "" {
+			fields[name] = msg
+		}
+	}
+
+	if len(fields) > 0 {
 		errPayload := map[string]any{
-			"error":  "validation_error",
-			"fields": missing,
+			"type":   "validation_error",
+			"fields": fields,
 			"hint":   "run this command with --describe to see the expected parameter schema",
 		}
 		writeStderrJSON(errPayload)
@@ -262,12 +322,68 @@ func validateParams(params map[string]any, schema OperationSchema) error {
 	return nil
 }
 
+func isEmptyValue(value any) bool {
+	switch v := value.(type) {
+	case string:
+		return v == ""
+	case []any:
+		return len(v) == 0
+	case []string:
+		return len(v) == 0
+	default:
+		return value == nil
+	}
+}
+
+func validateParamType(value any, typ string) string {
+	switch typ {
+	case "string":
+		if _, ok := value.(string); !ok {
+			return "expected string"
+		}
+	case "bool", "boolean":
+		if _, ok := value.(bool); !ok {
+			return "expected boolean"
+		}
+	case "int", "integer":
+		switch v := value.(type) {
+		case int:
+		case int64:
+		case float64:
+			if v != float64(int64(v)) {
+				return "expected integer"
+			}
+		default:
+			return "expected integer"
+		}
+	case "number":
+		switch value.(type) {
+		case int, int64, float64:
+		default:
+			return "expected number"
+		}
+	case "array":
+		switch value.(type) {
+		case []any, []string:
+		default:
+			return "expected array"
+		}
+	case "object":
+		if _, ok := value.(map[string]any); !ok {
+			return "expected object"
+		}
+	}
+	return ""
+}
+
 func handleRunError(err error) error {
-	if apiErr, ok := err.(*client.APIError); ok {
+	var apiErr *client.APIError
+	if errors.As(err, &apiErr) {
 		errPayload := map[string]any{
-			"error":       apiErr.Type,
+			"type":        apiErr.Type,
 			"message":     apiErr.Message,
 			"status_code": apiErr.StatusCode,
+			"retryable":   apiErr.Retryable,
 		}
 		if apiErr.Detail != nil {
 			errPayload["detail"] = apiErr.Detail
@@ -290,7 +406,7 @@ func writeResult(result any, flags flagAccessor) error {
 
 func writeStderrError(errType, message string) {
 	writeStderrJSON(map[string]any{
-		"error":   errType,
+		"type":    errType,
 		"message": message,
 	})
 }

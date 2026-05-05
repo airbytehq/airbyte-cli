@@ -310,6 +310,46 @@ func TestConnectorsDelete(t *testing.T) {
 	}
 }
 
+func TestConnectorPathEscapesID(t *testing.T) {
+	got := connectorPath("conn/1?x=y")
+	want := "/api/v1/integrations/connectors/conn%2F1%3Fx=y"
+	if got != want {
+		t.Errorf("connectorPath = %q, want %q", got, want)
+	}
+}
+
+func TestConnectorsDescribeReturnsSchemaError(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/integrations/connectors/conn-1":
+			_, _ = w.Write([]byte(`{"id": "conn-1", "name": "Test Connector"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/integrations/connectors/conn-1/execute":
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"detail": "describe failed"}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	_, err := connectorsDescribe(context.Background(), c, map[string]any{"id": "conn-1"})
+	if err == nil {
+		t.Fatal("expected describe schema error")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", apiErr.StatusCode)
+	}
+}
+
 func TestConnectorsResourceOperations(t *testing.T) {
 	res := &connectorsResource{}
 	ops := res.Operations()
