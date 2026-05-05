@@ -14,9 +14,12 @@ Show a connector's available entities (e.g. `users`, `contacts`, `orders`) and t
 ## Usage
 
 ```
-airbyte connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte connectors describe --workspace my-workspace --name my-source
+airbyte connectors describe --name my-source                  # workspace defaults to "default"
 airbyte connectors describe --id <connector-id>
 ```
+
+`workspace` is optional. If omitted while using `--name`, the command falls back to the workspace named `default` and prints a JSON notice on stderr.
 
 ## When to use
 

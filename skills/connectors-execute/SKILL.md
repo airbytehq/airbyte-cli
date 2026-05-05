@@ -14,6 +14,13 @@ Run an action against an entity on a connector — the workhorse command for act
 ## Usage
 
 ```
+airbyte connectors execute --workspace my-workspace --name my-source \
+  --entity users --action read
+
+# workspace defaults to "default" when omitted
+airbyte connectors execute --name my-source --entity users --action read
+
+# JSON form (mutually exclusive with the per-flag form)
 airbyte connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
@@ -22,7 +29,7 @@ airbyte connectors execute --json '{
 }'
 ```
 
-`workspace` + `name` (or `--id`), `entity`, and `action` are required.
+`name` (or `--id`), `entity`, and `action` are required. `workspace` is optional and defaults to `default` when used with `--name`; a JSON notice is printed on stderr when the fallback engages.
 
 ## Limiting response size
 

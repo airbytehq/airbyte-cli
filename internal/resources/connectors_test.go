@@ -12,6 +12,46 @@ import (
 	"github.com/airbytehq/airbyte-cli/internal/client"
 )
 
+func TestApplyDefaultWorkspace_Empty(t *testing.T) {
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	params := map[string]any{}
+	got := applyDefaultWorkspace(params)
+	if got != "default" {
+		t.Errorf("expected 'default', got %q", got)
+	}
+	if params["workspace"] != "default" {
+		t.Errorf("expected params['workspace']='default', got %v", params["workspace"])
+	}
+
+	var notice map[string]string
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
+		t.Fatalf("expected JSON notice on stderr, got %q (err: %v)", stderr.String(), err)
+	}
+	if notice["workspace"] != "default" {
+		t.Errorf("notice missing workspace=default: %v", notice)
+	}
+}
+
+func TestApplyDefaultWorkspace_Provided(t *testing.T) {
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	params := map[string]any{"workspace": "explicit-ws"}
+	got := applyDefaultWorkspace(params)
+	if got != "explicit-ws" {
+		t.Errorf("expected 'explicit-ws', got %q", got)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("expected no notice when workspace provided, got %q", stderr.String())
+	}
+}
+
 func TestResolveConnectorID_ByID(t *testing.T) {
 	params := map[string]any{"id": "conn-123"}
 	result, err := resolveConnectorID(context.Background(), nil, params)
@@ -38,18 +78,37 @@ func TestResolveConnectorID_MissingNameAndID(t *testing.T) {
 	}
 }
 
-func TestResolveConnectorID_MissingWorkspaceName(t *testing.T) {
+func TestResolveConnectorID_DefaultsWorkspaceWhenMissing(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("customer_name"); got != "default" {
+			t.Errorf("expected customer_name=default, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": "conn-xyz", "name": "my-connector"}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
 	params := map[string]any{"name": "my-connector"}
-	_, err := resolveConnectorID(context.Background(), nil, params)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	apiErr, ok := err.(*client.APIError)
-	if !ok {
-		t.Fatalf("expected *client.APIError, got %T", err)
+	if result["id"] != "conn-xyz" {
+		t.Errorf("expected id=conn-xyz, got %v", result["id"])
 	}
-	if apiErr.StatusCode != 400 {
-		t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+	if result["workspace"] != "default" {
+		t.Errorf("expected workspace='default' on params after fallback, got %v", result["workspace"])
+	}
+	if !strings.Contains(stderr.String(), "falling back") {
+		t.Errorf("expected fallback notice on stderr, got %q", stderr.String())
 	}
 }
 
@@ -178,9 +237,9 @@ func TestConnectorsListDefaultsWorkspace(t *testing.T) {
 	defer cleanup()
 
 	var stderr bytes.Buffer
-	prev := listStatusWriter
-	listStatusWriter = &stderr
-	defer func() { listStatusWriter = prev }()
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
 
 	if _, err := connectorsList(context.Background(), c, map[string]any{}); err != nil {
 		t.Fatalf("unexpected error: %v", err)

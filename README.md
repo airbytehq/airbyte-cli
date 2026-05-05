@@ -179,7 +179,7 @@ airbyte connectors execute --json '{
 # Create a new connector (opens a browser for secure credential entry)
 airbyte connectors create --json '{
   "workspace": "default",
-  "template_name": "source-hubspot"
+  "name": "hubspot"
 }'
 
 # Load a complex payload from a file

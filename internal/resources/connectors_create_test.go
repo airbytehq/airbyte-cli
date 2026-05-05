@@ -13,7 +13,7 @@ import (
 )
 
 func TestResolveTemplateID_ByID(t *testing.T) {
-	id, err := resolveTemplateID(context.Background(), nil, map[string]any{"template_id": "tmpl-123"})
+	id, err := resolveTemplateID(context.Background(), nil, map[string]any{"id": "tmpl-123"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -46,7 +46,7 @@ func TestResolveTemplateID_ByName(t *testing.T) {
 	c, cleanup := newTestClient(t, apiServer)
 	defer cleanup()
 
-	id, err := resolveTemplateID(context.Background(), c, map[string]any{"template_name": "salesforce"})
+	id, err := resolveTemplateID(context.Background(), c, map[string]any{"name": "salesforce"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestResolveTemplateID_NameNotFound(t *testing.T) {
 	c, cleanup := newTestClient(t, apiServer)
 	defer cleanup()
 
-	_, err := resolveTemplateID(context.Background(), c, map[string]any{"template_name": "missing"})
+	_, err := resolveTemplateID(context.Background(), c, map[string]any{"name": "missing"})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -170,8 +170,8 @@ func TestConnectorsCreateInteractive_Success(t *testing.T) {
 	t.Setenv("AIRBYTE_WEBAPP_URL", apiServer.URL)
 
 	result, err := connectorsCreateInteractive(context.Background(), c, map[string]any{
-		"template_name": "Salesforce",
-		"workspace":     "test-ws",
+		"name":      "Salesforce",
+		"workspace": "test-ws",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -231,8 +231,8 @@ func TestConnectorsCreateInteractive_Timeout(t *testing.T) {
 
 	start := time.Now()
 	result, err := connectorsCreateInteractive(context.Background(), c, map[string]any{
-		"template_id": "tmpl-1",
-		"workspace":   "test-ws",
+		"id":        "tmpl-1",
+		"workspace": "test-ws",
 	})
 	elapsed := time.Since(start)
 
@@ -292,8 +292,8 @@ func TestConnectorsCreateInteractive_CredentialFlowFailed(t *testing.T) {
 	t.Setenv("AIRBYTE_WEBAPP_URL", apiServer.URL)
 
 	_, err := connectorsCreateInteractive(context.Background(), c, map[string]any{
-		"template_id": "tmpl-1",
-		"workspace":   "test-ws",
+		"id":        "tmpl-1",
+		"workspace": "test-ws",
 	})
 	if err == nil {
 		t.Fatal("expected error for failed credential flow")
