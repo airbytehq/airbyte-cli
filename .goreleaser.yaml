@@ -1,0 +1,64 @@
+version: 2
+
+project_name: airbyte
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: airbyte
+    main: .
+    binary: airbyte
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/airbytehq/airbyte-cli/cmd.Version={{.Version}}
+      - -X github.com/airbytehq/airbyte-cli/cmd.Commit={{.Commit}}
+      - -X github.com/airbytehq/airbyte-cli/cmd.Date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - AGENTS.md
+      - CONTEXT.md
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+
+release:
+  draft: true
+  prerelease: auto
+  name_template: "v{{ .Version }}"
