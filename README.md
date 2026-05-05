@@ -9,7 +9,7 @@ The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.
 - **Resource-driven**: commands aren't hand-written Cobra trees. Resources are declared as Go structs in `internal/resources/`, registered into a global registry, and dynamically materialized into Cobra commands at startup.
 - **Self-describing**: any command will print its full parameter schema with `--describe`, so callers (especially LLMs) can discover required fields without guessing.
 - **Minimal**: only two external dependencies (Cobra + pflag). Everything else is stdlib.
-- **Embedded skills**: usage guidance for common workflows (auth, connectors, workspaces, discovery) is compiled into the binary and accessible via `airbyte skills`.
+- **Distributable skills**: per-command agent skill documents live in `skills/<command>/SKILL.md` for downstream tooling (e.g. Claude Code) to consume directly.
 
 See `AGENTS.md` for the full architecture reference and `CONTEXT.md` for the agent-facing usage guide.
 
@@ -30,7 +30,8 @@ main.go
 | --- | --- |
 | `cmd/` | Root Cobra command, persistent flags, version |
 | `internal/registry/` | `Resource` interface, dynamic command builder |
-| `internal/resources/` | Resource implementations + embedded skill docs |
+| `internal/resources/` | Resource implementations |
+| `skills/` | Per-command agent skill documents (`<command>/SKILL.md`) |
 | `internal/client/` | HTTP client (3x exponential-backoff retry on 429/5xx, 30s timeout) |
 | `internal/auth/` | Credential resolution, OAuth token caching |
 | `internal/config/` | Environment variable loader |
@@ -127,7 +128,6 @@ airbyte connectors execute --describe       # show parameter schema
 | `connectors` | `execute` | Run an action on a connector |
 | `connectors` | `create` | Interactive browser-based credential flow |
 | `connectors` | `delete` | Delete a connector |
-| `skills` | `list` / `show` | Read embedded usage guides |
 
 ### Examples
 
@@ -184,14 +184,7 @@ When you see a validation error, re-run the command with `--describe` to inspect
 
 ## Skills
 
-Skill documents are markdown files compiled into the binary via `//go:embed`. They provide task-oriented guidance for agents.
-
-```bash
-airbyte skills list
-airbyte skills show --json '{"name": "connectors"}'
-```
-
-Available skills: `getting-started`, `connectors`, `workspaces`, `discovery`.
+Per-command agent skill documents live under `skills/<command>/SKILL.md`, each with YAML frontmatter (`name`, `description`, `command`) and task-oriented guidance. They are designed to be consumed by agent harnesses (e.g. Claude Code) — copy or symlink the directory into the harness's skill location, or distribute via your own tooling.
 
 ## Develop
 

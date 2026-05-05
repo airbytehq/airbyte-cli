@@ -158,16 +158,6 @@ echo '{"workspace": "my-workspace", "name": "my-source", "entity": "users", "act
 airbyte connectors execute --json @params.json
 ```
 
-### 8. Skills
-
-```bash
-# List available skill documents
-airbyte skills list
-
-# Read a specific skill
-airbyte skills show --json '{"name": "connectors"}'
-```
-
 ## Error Handling
 
 All errors are JSON on stderr with an exit code:
