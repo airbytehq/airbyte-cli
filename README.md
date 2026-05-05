@@ -1,4 +1,4 @@
-# airbyte
+# airbyte-cli
 
 A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents.
 
