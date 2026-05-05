@@ -170,8 +170,8 @@ func TestConnectorsCreateInteractive_Success(t *testing.T) {
 	t.Setenv("AIRBYTE_WEBAPP_URL", apiServer.URL)
 
 	result, err := connectorsCreateInteractive(context.Background(), c, map[string]any{
-		"template_name":  "Salesforce",
-		"workspace": "test-ws",
+		"template_name": "Salesforce",
+		"workspace":     "test-ws",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -231,8 +231,8 @@ func TestConnectorsCreateInteractive_Timeout(t *testing.T) {
 
 	start := time.Now()
 	result, err := connectorsCreateInteractive(context.Background(), c, map[string]any{
-		"template_id":    "tmpl-1",
-		"workspace": "test-ws",
+		"template_id": "tmpl-1",
+		"workspace":   "test-ws",
 	})
 	elapsed := time.Since(start)
 
@@ -292,8 +292,8 @@ func TestConnectorsCreateInteractive_CredentialFlowFailed(t *testing.T) {
 	t.Setenv("AIRBYTE_WEBAPP_URL", apiServer.URL)
 
 	_, err := connectorsCreateInteractive(context.Background(), c, map[string]any{
-		"template_id":    "tmpl-1",
-		"workspace": "test-ws",
+		"template_id": "tmpl-1",
+		"workspace":   "test-ws",
 	})
 	if err == nil {
 		t.Fatal("expected error for failed credential flow")

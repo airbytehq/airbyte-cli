@@ -26,9 +26,9 @@ func connectorsCreateOperation() registry.Operation {
 		Schema: registry.OperationSchema{
 			Description: "Create a connector from a template with interactive credential flow",
 			Params: map[string]registry.ParamSchema{
-				"template_id":    {Type: "string", Required: false, Description: "Source template ID"},
-				"template_name":  {Type: "string", Required: false, Description: "Source template name (alternative to template_id)"},
-				"workspace": {Type: "string", Required: true, Description: "Workspace name"},
+				"template_id":   {Type: "string", Required: false, Description: "Source template ID"},
+				"template_name": {Type: "string", Required: false, Description: "Source template name (alternative to template_id)"},
+				"workspace":     {Type: "string", Required: true, Description: "Workspace name"},
 			},
 		},
 		Hooks: registry.OperationHooks{

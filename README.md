@@ -58,6 +58,14 @@ go build -o airbyte .
 
 Credentials can be supplied via environment variables or a credentials file at `~/.airbyte/credentials` (JSON, `0600` permissions).
 
+### Resolution order
+
+1. **Environment variables** — used if both `AIRBYTE_CLIENT_ID` and `AIRBYTE_CLIENT_SECRET` are set. If either is missing, the CLI falls through to the file.
+2. **Credentials file** at `~/.airbyte/credentials`.
+3. If neither is configured, the CLI exits with an authentication error.
+
+Env vars take precedence over the file when both are present, so they're useful for one-off overrides (e.g. `AIRBYTE_CLIENT_ID=... airbyte ...`).
+
 ### Environment variables
 
 | Variable | Description | Default |

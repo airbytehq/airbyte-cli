@@ -44,9 +44,9 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 			Schema: registry.OperationSchema{
 				Description: "Get connector details and schema description",
 				Params: map[string]registry.ParamSchema{
-					"name":           {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
+					"name":      {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
 					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
-					"id":             {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
+					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
 			Run: connectorsDescribe,
@@ -61,7 +61,7 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "Execute an action on a connector",
 				Params: map[string]registry.ParamSchema{
 					"name":           {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
-					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
+					"workspace":      {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
 					"id":             {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 					"entity":         {Type: "string", Required: true, Description: "Entity name"},
 					"action":         {Type: "string", Required: true, Description: "Action name"},
@@ -81,9 +81,9 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 			Schema: registry.OperationSchema{
 				Description: "Delete a connector by name or ID",
 				Params: map[string]registry.ParamSchema{
-					"name":           {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
+					"name":      {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
 					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
-					"id":             {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
+					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
 			Run: connectorsDelete,
