@@ -1,10 +1,12 @@
 package resources
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
@@ -159,6 +161,40 @@ func TestConnectorsList(t *testing.T) {
 	data, ok := parsed["data"].([]any)
 	if !ok || len(data) != 1 {
 		t.Errorf("expected 1 connector, got %v", parsed["data"])
+	}
+}
+
+func TestConnectorsListDefaultsWorkspace(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("customer_name"); got != "default" {
+			t.Errorf("expected customer_name=default, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": []}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	var stderr bytes.Buffer
+	prev := listStatusWriter
+	listStatusWriter = &stderr
+	defer func() { listStatusWriter = prev }()
+
+	if _, err := connectorsList(context.Background(), c, map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var notice map[string]string
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
+		t.Fatalf("expected JSON notice on stderr, got %q (err: %v)", stderr.String(), err)
+	}
+	if notice["workspace"] != "default" {
+		t.Errorf("expected workspace=default in notice, got %q", notice["workspace"])
+	}
+	if !strings.Contains(notice["message"], "falling back") {
+		t.Errorf("expected message to mention fallback, got %q", notice["message"])
 	}
 }
 

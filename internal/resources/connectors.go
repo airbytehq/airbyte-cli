@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -23,9 +25,9 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 			Name:        "list",
 			Description: "List connectors in a workspace",
 			Schema: registry.OperationSchema{
-				Description: "List all connectors for a workspace",
+				Description: "List all connectors for a workspace. If 'workspace' is omitted, falls back to 'default'.",
 				Params: map[string]registry.ParamSchema{
-					"workspace": {Type: "string", Required: true, Description: "Workspace name"},
+					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when omitted)"},
 				},
 			},
 			Run: connectorsList,
@@ -167,8 +169,23 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 	}
 }
 
+const defaultWorkspaceName = "default"
+
+// listStatusWriter is the stream where connectorsList prints user-facing
+// status messages (e.g. the workspace fallback notice). Tests override it to
+// capture output without touching os.Stderr.
+var listStatusWriter io.Writer = os.Stderr
+
 func connectorsList(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	workspaceName, _ := params["workspace"].(string)
+	if workspaceName == "" {
+		workspaceName = defaultWorkspaceName
+		notice, _ := json.Marshal(map[string]string{
+			"message":   fmt.Sprintf("no workspace provided; falling back to %q", defaultWorkspaceName),
+			"workspace": defaultWorkspaceName,
+		})
+		fmt.Fprintln(listStatusWriter, string(notice))
+	}
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
 		"customer_name": workspaceName,
 	})
