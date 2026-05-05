@@ -1,0 +1,64 @@
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+)
+
+var (
+	format   string
+	describe bool
+	output   string
+	verbose  bool
+)
+
+var rootCmd = &cobra.Command{
+	Use:   "airbyte",
+	Short: "Airbyte CLI",
+	Long:  "Command-line interface for interacting with the Airbyte platform.",
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
+	SilenceUsage:  true,
+	SilenceErrors: true,
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(&format, "format", "json", "Output format (json|table)")
+	rootCmd.PersistentFlags().BoolVar(&describe, "describe", false, "Print operation schema as JSON and exit")
+	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", "Output file path")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable debug logging")
+}
+
+func Execute() error {
+	return rootCmd.Execute()
+}
+
+func GetRootCmd() *cobra.Command {
+	return rootCmd
+}
+
+func GetFormat() string {
+	return format
+}
+
+func GetDescribe() bool {
+	return describe
+}
+
+func GetVerbose() bool {
+	return verbose
+}
+
+func GetOutput() string {
+	return output
+}
+
+type flags struct{}
+
+func (f flags) GetFormat() string { return format }
+func (f flags) GetOutput() string { return output }
+func (f flags) GetDescribe() bool { return describe }
+
+func FlagAccessor() flags {
+	return flags{}
+}
