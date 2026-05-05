@@ -1,0 +1,35 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"go.useLanguageServer": true,
+		"go.lintTool": "golangci-lint",
+		"go.lintOnSave": "package",
+		"go.formatTool": "goimports",
+		"go.testFlags": ["-v"],
+		"[go]": {
+			"editor.formatOnSave": true,
+			"editor.codeActionsOnSave": {
+				"source.organizeImports": "explicit"
+			},
+			"editor.insertSpaces": false,
+			"editor.tabSize": 4
+		},
+		"gopls": {
+			"ui.semanticTokens": true,
+			"formatting.gofumpt": true
+		},
+		"files.exclude": {
+			"**/.git": true,
+			"**/.DS_Store": true
+		}
+	},
+	"extensions": {
+		"recommendations": [
+			"golang.go"
+		]
+	}
+}
