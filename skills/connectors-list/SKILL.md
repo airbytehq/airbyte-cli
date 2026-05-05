@@ -11,11 +11,12 @@ List the connectors that already exist in a given workspace.
 ## Usage
 
 ```
-airbyte connectors list --json '{"workspace": "my-workspace"}'
-airbyte connectors list --json '{"workspace": "my-workspace"}' --format table
+airbyte connectors list --workspace my-workspace
+airbyte connectors list --workspace my-workspace --format table
+airbyte connectors list                              # falls back to workspace="default"
 ```
 
-`workspace` is required. Run with `--describe` to see the full parameter schema (filter, status, etc.).
+`workspace` is optional. If omitted, the command falls back to the workspace named `default` and prints a JSON notice on stderr — the API call still proceeds. To target a different workspace, pass `--workspace <name>` (or use `--json '{"workspace": "..."}'`).
 
 ## When to use
 
