@@ -119,7 +119,7 @@ airbyte connectors list-available --format table
 # Create (opens browser for secure credential entry)
 airbyte connectors create --json '{
   "workspace": "my-workspace",
-  "template_name": "source-hubspot"
+  "name": "hubspot"
 }'
 ```
 

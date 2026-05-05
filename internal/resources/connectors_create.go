@@ -28,9 +28,9 @@ func connectorsCreateOperation() registry.Operation {
 		Schema: registry.OperationSchema{
 			Description: "Create a connector from a template with interactive credential flow",
 			Params: map[string]registry.ParamSchema{
-				"template_id":   {Type: "string", Required: false, Description: "Source template ID"},
-				"template_name": {Type: "string", Required: false, Description: "Source template name (alternative to template_id)"},
-				"workspace":     {Type: "string", Required: true, Description: "Workspace name"},
+				"id":        {Type: "string", Required: false, Description: "Source template ID"},
+				"name":      {Type: "string", Required: false, Description: "Source template name (alternative to id)"},
+				"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when omitted)"},
 			},
 		},
 		Hooks: registry.OperationHooks{
@@ -40,7 +40,7 @@ func connectorsCreateOperation() registry.Operation {
 }
 
 func connectorsCreateInteractive(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-	workspaceName, _ := params["workspace"].(string)
+	workspaceName := applyDefaultWorkspace(params)
 
 	templateID, err := resolveTemplateID(ctx, c, params)
 	if err != nil {
@@ -178,13 +178,13 @@ func connectorsCreateInteractive(ctx context.Context, c *client.Client, params m
 }
 
 func resolveTemplateID(ctx context.Context, c *client.Client, params map[string]any) (string, error) {
-	if id, ok := params["template_id"].(string); ok && id != "" {
+	if id, ok := params["id"].(string); ok && id != "" {
 		return id, nil
 	}
-	name, ok := params["template_name"].(string)
+	name, ok := params["name"].(string)
 	if !ok || name == "" {
 		return "", client.NewValidationError(
-			"either template_id or template_name is required",
+			"either 'id' or 'name' is required",
 			"run 'airbyte connectors list-available' to see available templates",
 		)
 	}

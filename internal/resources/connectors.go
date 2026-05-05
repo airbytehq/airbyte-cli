@@ -48,7 +48,7 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "Get connector details and schema description",
 				Params: map[string]registry.ParamSchema{
 					"name":      {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
-					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
+					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when used with name)"},
 					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
@@ -85,7 +85,7 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "Delete a connector by name or ID",
 				Params: map[string]registry.ParamSchema{
 					"name":      {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
-					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
+					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when used with name)"},
 					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
@@ -120,13 +120,7 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 		return params, nil
 	}
 
-	workspaceName, _ := params["workspace"].(string)
-	if workspaceName == "" {
-		return nil, client.NewValidationError(
-			"workspace is required when using name",
-			"run 'airbyte workspaces list' to find workspace names",
-		)
-	}
+	workspaceName := applyDefaultWorkspace(params)
 
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
 		"customer_name": workspaceName,
@@ -171,21 +165,30 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 
 const defaultWorkspaceName = "default"
 
-// listStatusWriter is the stream where connectorsList prints user-facing
+// statusWriter is the stream where the connectors resource prints user-facing
 // status messages (e.g. the workspace fallback notice). Tests override it to
 // capture output without touching os.Stderr.
-var listStatusWriter io.Writer = os.Stderr
+var statusWriter io.Writer = os.Stderr
+
+// applyDefaultWorkspace resolves params["workspace"], falling back to the
+// default workspace and emitting a JSON notice when not provided. Mutates
+// params so downstream code can read the resolved name back from it.
+func applyDefaultWorkspace(params map[string]any) string {
+	name, _ := params["workspace"].(string)
+	if name != "" {
+		return name
+	}
+	notice, _ := json.Marshal(map[string]string{
+		"message":   fmt.Sprintf("no workspace provided; falling back to %q", defaultWorkspaceName),
+		"workspace": defaultWorkspaceName,
+	})
+	fmt.Fprintln(statusWriter, string(notice))
+	params["workspace"] = defaultWorkspaceName
+	return defaultWorkspaceName
+}
 
 func connectorsList(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-	workspaceName, _ := params["workspace"].(string)
-	if workspaceName == "" {
-		workspaceName = defaultWorkspaceName
-		notice, _ := json.Marshal(map[string]string{
-			"message":   fmt.Sprintf("no workspace provided; falling back to %q", defaultWorkspaceName),
-			"workspace": defaultWorkspaceName,
-		})
-		fmt.Fprintln(listStatusWriter, string(notice))
-	}
+	workspaceName := applyDefaultWorkspace(params)
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
 		"customer_name": workspaceName,
 	})

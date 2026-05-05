@@ -92,7 +92,7 @@ The CLI uses a **resource-registry** pattern:
 | `connectors` | `list-available` | List connector templates | -- |
 | `connectors` | `describe` | Get connector details + schema | `name`+`workspace` or `--id` |
 | `connectors` | `execute` | Execute a connector action | `name`+`workspace` or `--id`, `entity`, `action`, `params` |
-| `connectors` | `create` | Interactive credential flow | `workspace`, `template_name` or `template_id` |
+| `connectors` | `create` | Interactive credential flow | `workspace`, `name` (template) or `id` (template ID) |
 | `connectors` | `delete` | Delete a connector | `name`+`workspace` or `--id` |
 
 ### Common Flags
