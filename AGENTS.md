@@ -8,7 +8,7 @@
 > **Registry Architecture**: Commands are defined as `Resource` + `Operation` structs in `internal/resources/`, NOT as raw Cobra commands in `cmd/`. When adding a new command, implement the `Resource` interface and register it in `register.go`. Do NOT add `cobra.Command` definitions directly.
 
 > [!IMPORTANT]
-> **Embedded Skills**: Skill documents live in `internal/resources/skills/*.md` and are compiled into the binary via `//go:embed`. Do not create external skill files or reference paths outside this directory.
+> **Skills**: Per-command agent skill documents live at `skills/<command>/SKILL.md` (top-level `skills/` directory), each with YAML frontmatter (`name`, `description`, `command`). They are not embedded in the binary — they are distributed separately for agent harnesses to consume.
 
 > [!NOTE]
 > **Minimal Dependencies**: The CLI has only 2 external dependencies (Cobra + pflag). Everything else is stdlib. Do not add new dependencies without strong justification.
@@ -40,7 +40,8 @@ The CLI uses a **resource-registry** pattern:
 | `main.go` | Entry point: config -> auth -> client -> registry -> execute |
 | `cmd/` | Root Cobra command, persistent flags, version command |
 | `internal/registry/` | Resource/Operation types, dynamic Cobra command builder |
-| `internal/resources/` | All resource implementations + embedded skill docs |
+| `internal/resources/` | All resource implementations |
+| `skills/` | Per-command agent skill documents (`<command>/SKILL.md` with YAML frontmatter) |
 | `internal/client/` | HTTP client with retry logic, structured error types |
 | `internal/auth/` | Credential resolution (env -> file), OAuth token caching |
 | `internal/config/` | Environment variable configuration loader |
@@ -64,7 +65,6 @@ The CLI uses a **resource-registry** pattern:
 | `workspaces.go` | `workspaces list` -- list/filter workspaces with automatic cursor pagination |
 | `connectors.go` | `connectors list\|list-available\|describe\|execute\|delete` -- connector management with name->ID resolution hooks |
 | `connectors_create.go` | `connectors create` -- interactive browser-based credential flow (OAuth session + polling) |
-| `skills.go` | `skills list\|show` -- embedded skill document access via `//go:embed` |
 
 ### Client (`internal/client/`)
 
@@ -94,8 +94,6 @@ The CLI uses a **resource-registry** pattern:
 | `connectors` | `execute` | Execute a connector action | `name`+`workspace` or `--id`, `entity`, `action`, `params` |
 | `connectors` | `create` | Interactive credential flow | `workspace`, `template_name` or `template_id` |
 | `connectors` | `delete` | Delete a connector | `name`+`workspace` or `--id` |
-| `skills` | `list` | List available skill docs | -- |
-| `skills` | `show` | Show skill document content | `name` (required) |
 
 ### Global Flags
 
@@ -196,24 +194,24 @@ When adding a new resource or operation:
 3. Add tests in `internal/resources/<name>_test.go` using `newTestTokenServer()` and `newTestClient()` helpers
 4. If the resource uses name-based lookup, add a `PreRun` hook for server-side ID resolution
 5. Update the **Command Surface** table in this file
-6. If the resource needs usage guidance, add a skill document in `internal/resources/skills/<name>.md`
+6. If the resource adds a new leaf command, add a corresponding `skills/<command>/SKILL.md` with frontmatter (`name`, `description`, `command`) and task-oriented agent guidance
 
 ### Adding New Skills
 
-Skill documents auto-register via Go's `//go:embed` directive. To add a new skill:
+Skills are plain markdown files at `skills/<command>/SKILL.md`. To add one:
 
-1. Create `internal/resources/skills/<name>.md` with a `# Title` heading followed by a one-line description
-2. The skill will automatically appear in `airbyte skills list` and be readable via `airbyte skills show --json '{"name": "<name>"}'`
-3. No code changes required -- the embed FS picks up all `.md` files in the directory
+1. Create the folder: `skills/<resource>-<operation>/`
+2. Add `SKILL.md` with YAML frontmatter:
+   ```
+   ---
+   name: <resource>-<operation>
+   description: <one-line summary used by listing tools>
+   command: airbyte <resource> <operation>
+   ---
+   ```
+3. Follow with task-oriented body content (when to use, usage examples, error recovery, "do NOT" guidance).
+4. No Go changes required — skills are not embedded in the binary.
 
 ## Skills Reference
 
-| Skill | Purpose |
-| --- | --- |
-| `getting-started` | Auth setup, first commands, schema discovery, error handling |
-| `connectors` | Connector management workflows, credential flow, error recovery |
-| `workspaces` | Workspace discovery and filtering |
-| `discovery` | First-time enrollment, provisioning, organization listing |
-
-Run `airbyte skills list` to see all available skills.
-Run `airbyte skills show --json '{"name": "<skill>"}'` for detailed guidance.
+Skills live at `skills/<command>/SKILL.md`, one per leaf command. Browse the `skills/` directory directly to see what is available.

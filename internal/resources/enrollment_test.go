@@ -206,7 +206,6 @@ func TestResourceMetadata(t *testing.T) {
 		{&organizationsResource{}, "organizations", "Manage organizations"},
 		{&workspacesResource{}, "workspaces", "Manage workspaces"},
 		{&connectorsResource{}, "connectors", "Manage connectors"},
-		{&skillsResource{}, "skills", "Agent skill documents"},
 	}
 
 	for _, tt := range tests {
