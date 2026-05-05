@@ -1,0 +1,608 @@
+package registry
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/spf13/cobra"
+)
+
+// stubClient returns a non-nil Client for tests whose operations never make HTTP calls.
+func stubClient() *client.Client {
+	return client.New("", "", "test", nil)
+}
+
+type stubFlags struct {
+	format   string
+	output   string
+	describe bool
+}
+
+func (s *stubFlags) GetFormat() string {
+	return s.format
+}
+
+func (s *stubFlags) GetOutput() string {
+	return s.output
+}
+
+func (s *stubFlags) GetDescribe() bool {
+	return s.describe
+}
+
+func newTestRoot() *cobra.Command {
+	root := &cobra.Command{
+		Use:           "airbyte",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	root.PersistentFlags().String("format", "json", "")
+	root.PersistentFlags().Bool("describe", false, "")
+	root.PersistentFlags().StringP("output", "o", "", "")
+	return root
+}
+
+func captureExit(t *testing.T) (exitCode *int, restore func()) {
+	t.Helper()
+	old := osExit
+	code := new(int)
+	*code = -1
+	osExit = func(c int) {
+		*code = c
+		panic("osExit called")
+	}
+	return code, func() { osExit = old }
+}
+
+func TestBuildCreatesCommands(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("connectors", "Manage connectors",
+		newMockOperation("list"),
+		newMockOperation("get"),
+	))
+
+	root := newTestRoot()
+	flags := &stubFlags{format: "json"}
+	Build(root, nil, flags)
+
+	resCmd, _, err := root.Find([]string{"connectors"})
+	if err != nil {
+		t.Fatalf("expected 'connectors' command: %v", err)
+	}
+	if resCmd.Use != "connectors" {
+		t.Errorf("expected Use='connectors', got %q", resCmd.Use)
+	}
+
+	listCmd, _, err := root.Find([]string{"connectors", "list"})
+	if err != nil {
+		t.Fatalf("expected 'connectors list' command: %v", err)
+	}
+	if listCmd.Use != "list" {
+		t.Errorf("expected Use='list', got %q", listCmd.Use)
+	}
+
+	getCmd, _, err := root.Find([]string{"connectors", "get"})
+	if err != nil {
+		t.Fatalf("expected 'connectors get' command: %v", err)
+	}
+	if getCmd.Use != "get" {
+		t.Errorf("expected Use='get', got %q", getCmd.Use)
+	}
+}
+
+func TestBuildOperationFlags(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("test", "Test resource", newMockOperation("execute")))
+
+	root := newTestRoot()
+	flags := &stubFlags{format: "json"}
+	Build(root, nil, flags)
+
+	cmd, _, _ := root.Find([]string{"test", "execute"})
+	jsonFlag := cmd.Flags().Lookup("json")
+	if jsonFlag == nil {
+		t.Fatal("expected --json flag on operation command")
+	}
+
+	idFlag := cmd.Flags().Lookup("id")
+	if idFlag == nil {
+		t.Fatal("expected --id flag on operation command")
+	}
+}
+
+func TestDescribeReturnsSchema(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	schema := OperationSchema{
+		Description: "List all items",
+		Params: map[string]ParamSchema{
+			"workspace_id": {Type: "string", Required: true, Description: "Workspace ID"},
+			"limit":        {Type: "integer", Required: false, Description: "Max results", Default: 20},
+		},
+	}
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "list",
+			Description: "List items",
+			Schema:      schema,
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", describe: true}
+	Build(root, nil, flags)
+
+	root.SetArgs([]string{"items", "list"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if *exitCode != client.ExitSuccess {
+		t.Fatalf("expected exit code %d, got %d", client.ExitSuccess, *exitCode)
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var result OperationSchema
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing describe output: %v (output: %s)", err, buf.String())
+	}
+
+	if result.Description != "List all items" {
+		t.Errorf("expected description 'List all items', got %q", result.Description)
+	}
+	if _, ok := result.Params["workspace_id"]; !ok {
+		t.Error("expected 'workspace_id' param in schema")
+	}
+	if !result.Params["workspace_id"].Required {
+		t.Error("expected 'workspace_id' to be required")
+	}
+}
+
+func TestRunReturnsJSON(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "list",
+			Description: "List items",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return []map[string]string{{"id": "1", "name": "alpha"}}, nil
+			},
+		},
+	))
+
+	tmpFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: tmpFile}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"items", "list", "--json", "{}"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(tmpFile)
+	if err != nil {
+		t.Fatalf("reading output file: %v", err)
+	}
+
+	var result []map[string]string
+	if err := json.Unmarshal(data, &result); err != nil {
+		t.Fatalf("parsing output: %v", err)
+	}
+	if len(result) != 1 || result[0]["id"] != "1" {
+		t.Errorf("unexpected output: %s", string(data))
+	}
+}
+
+func TestMissingRequiredParamReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name:        "create",
+			Description: "Create thing",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"entity": {Type: "string", Required: true, Description: "Entity name"},
+					"type":   {Type: "string", Required: true, Description: "Entity type"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	flags := &stubFlags{format: "json"}
+	Build(root, nil, flags)
+
+	root.SetArgs([]string{"things", "create", "--json", "{}"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (output: %s)", err, buf.String())
+	}
+
+	if result["error"] != "validation_error" {
+		t.Errorf("expected error 'validation_error', got %v", result["error"])
+	}
+
+	fields, ok := result["fields"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected 'fields' map, got %T: %v", result["fields"], result["fields"])
+	}
+	if fields["entity"] != "required" {
+		t.Errorf("expected field 'entity'='required', got %v", fields["entity"])
+	}
+	if fields["type"] != "required" {
+		t.Errorf("expected field 'type'='required', got %v", fields["type"])
+	}
+}
+
+func TestFileInput(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name:        "create",
+			Description: "Create thing",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"name": {Type: "string", Required: true, Description: "Name"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				captured = params
+				return map[string]string{"status": "created"}, nil
+			},
+		},
+	))
+
+	tmpDir := t.TempDir()
+	inputFile := filepath.Join(tmpDir, "input.json")
+	if err := os.WriteFile(inputFile, []byte(`{"name":"test-thing"}`), 0o644); err != nil {
+		t.Fatalf("writing input file: %v", err)
+	}
+
+	outFile := filepath.Join(tmpDir, "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: outFile}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"things", "create", "--json", "@" + inputFile})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if captured["name"] != "test-thing" {
+		t.Errorf("expected name='test-thing', got %v", captured["name"])
+	}
+}
+
+func TestIDFlag(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name:        "get",
+			Description: "Get thing",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"id": {Type: "string", Required: true, Description: "ID"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				captured = params
+				return map[string]string{"id": params["id"].(string)}, nil
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: outFile}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"things", "get", "--id", "abc-123"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if captured["id"] != "abc-123" {
+		t.Errorf("expected id='abc-123', got %v", captured["id"])
+	}
+}
+
+func TestInteractiveHookOverridesRun(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	runCalled := false
+	interactiveCalled := false
+
+	Register(newMockResource("auth", "Auth",
+		Operation{
+			Name:        "login",
+			Description: "Login",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				runCalled = true
+				return nil, nil
+			},
+			Hooks: OperationHooks{
+				Interactive: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+					interactiveCalled = true
+					return map[string]string{"status": "authenticated"}, nil
+				},
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: outFile}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"auth", "login"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if runCalled {
+		t.Error("Run should not be called when Interactive hook is set")
+	}
+	if !interactiveCalled {
+		t.Error("Interactive hook should be called")
+	}
+}
+
+func TestPreRunHookModifiesParams(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var capturedParams map[string]any
+
+	Register(newMockResource("resources", "Resources",
+		Operation{
+			Name:        "create",
+			Description: "Create",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"name": {Type: "string", Required: true, Description: "Name"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				capturedParams = params
+				return map[string]string{"status": "ok"}, nil
+			},
+			Hooks: OperationHooks{
+				PreRun: func(ctx context.Context, c *client.Client, params map[string]any) (map[string]any, error) {
+					params["injected"] = "by-prerun"
+					return params, nil
+				},
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: outFile}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"resources", "create", "--json", `{"name":"test"}`})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if capturedParams["injected"] != "by-prerun" {
+		t.Errorf("expected PreRun to inject 'injected' param, got %v", capturedParams)
+	}
+	if capturedParams["name"] != "test" {
+		t.Errorf("expected name='test', got %v", capturedParams["name"])
+	}
+}
+
+func TestPreRunHookError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	runCalled := false
+	Register(newMockResource("resources", "Resources",
+		Operation{
+			Name:        "create",
+			Description: "Create",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				runCalled = true
+				return nil, nil
+			},
+			Hooks: OperationHooks{
+				PreRun: func(ctx context.Context, c *client.Client, params map[string]any) (map[string]any, error) {
+					return nil, &client.APIError{
+						Type:       "server_error",
+						Message:    "prerun failed",
+						StatusCode: 500,
+						Retryable:  false,
+					}
+				},
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	flags := &stubFlags{format: "json"}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"resources", "create"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	if runCalled {
+		t.Error("Run should not be called when PreRun hook fails")
+	}
+	if *exitCode != client.ExitGeneral {
+		t.Errorf("expected exit code %d, got %d", client.ExitGeneral, *exitCode)
+	}
+}
+
+func TestTableOutput(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "list",
+			Description: "List items",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return []map[string]string{
+					{"id": "1", "name": "alpha"},
+					{"id": "2", "name": "beta"},
+				}, nil
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.txt")
+	root := newTestRoot()
+	flags := &stubFlags{format: "table", output: outFile}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"items", "list", "--json", "{}"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("reading output file: %v", err)
+	}
+
+	content := string(data)
+	if !bytes.Contains([]byte(content), []byte("ID")) {
+		t.Errorf("expected table header 'ID' in output: %s", content)
+	}
+	if !bytes.Contains([]byte(content), []byte("NAME")) {
+		t.Errorf("expected table header 'NAME' in output: %s", content)
+	}
+	if !bytes.Contains([]byte(content), []byte("alpha")) {
+		t.Errorf("expected 'alpha' in output: %s", content)
+	}
+}
+
+func TestNilClientReturnsAuthError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "list",
+			Description: "List items",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				t.Fatal("Run should not be called with nil client")
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	flags := &stubFlags{format: "json"}
+	Build(root, nil, flags)
+
+	root.SetArgs([]string{"items", "list", "--json", "{}"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitAuth {
+		t.Fatalf("expected exit code %d, got %d", client.ExitAuth, *exitCode)
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (output: %s)", err, buf.String())
+	}
+
+	if result["error"] != "auth_error" {
+		t.Errorf("expected error 'auth_error', got %v", result["error"])
+	}
+}
