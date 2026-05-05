@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
@@ -40,9 +41,26 @@ func Build(rootCmd *cobra.Command, c *client.Client, flags flagAccessor) {
 	}
 }
 
+// paramBinding holds the flag-name and the bound pointer for a single schema
+// parameter. Only the field matching `kind` is populated.
+type paramBinding struct {
+	flagName string
+	kind     string
+	strVal   *string
+	boolVal  *bool
+	intVal   *int
+	floatVal *float64
+	sliceVal *[]string
+}
+
+// flagNameFor maps a snake_case schema key to a kebab-case CLI flag.
+func flagNameFor(schemaKey string) string {
+	return strings.ReplaceAll(schemaKey, "_", "-")
+}
+
 func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cobra.Command {
 	var jsonInput string
-	var idFlag string
+	bindings := map[string]*paramBinding{}
 
 	cmd := &cobra.Command{
 		Use:   op.Name,
@@ -57,7 +75,7 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			params, err := parseAndValidate(jsonInput, idFlag, op.Schema)
+			params, err := collectParams(cmd, jsonInput, bindings, op.Schema)
 			if err != nil {
 				return err
 			}
@@ -98,16 +116,73 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 		SilenceErrors: true,
 	}
 
-	cmd.Flags().StringVar(&jsonInput, "json", "", "Input parameters as JSON (or @filename to read from file)")
-	cmd.Flags().StringVar(&idFlag, "id", "", "Resource ID (convenience for --json '{\"id\": \"...\"}')")
+	cmd.Flags().StringVar(&jsonInput, "json", "", "Input parameters as JSON (or @filename to read from file). Cannot be combined with parameter flags.")
+
+	keys := make([]string, 0, len(op.Schema.Params))
+	for k := range op.Schema.Params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		ps := op.Schema.Params[key]
+		flagName := flagNameFor(key)
+		desc := ps.Description
+		if ps.Required {
+			desc += " (required)"
+		}
+		b := &paramBinding{flagName: flagName, kind: ps.Type}
+		switch ps.Type {
+		case "string":
+			b.strVal = new(string)
+			cmd.Flags().StringVar(b.strVal, flagName, "", desc)
+		case "bool", "boolean":
+			b.boolVal = new(bool)
+			cmd.Flags().BoolVar(b.boolVal, flagName, false, desc)
+		case "int", "integer":
+			b.intVal = new(int)
+			cmd.Flags().IntVar(b.intVal, flagName, 0, desc)
+		case "number":
+			b.floatVal = new(float64)
+			cmd.Flags().Float64Var(b.floatVal, flagName, 0, desc)
+		case "array":
+			b.sliceVal = new([]string)
+			cmd.Flags().StringSliceVar(b.sliceVal, flagName, nil, desc+" (comma-separated, or repeat the flag)")
+		default:
+			// "object" or unknown types have no flag form — caller must use --json.
+			continue
+		}
+		bindings[key] = b
+	}
 
 	return cmd
 }
 
-func parseAndValidate(jsonInput, idFlag string, schema OperationSchema) (map[string]any, error) {
-	params := make(map[string]any)
+// collectParams resolves the operation's parameters from either --json or the
+// per-parameter flags, enforcing that the two modes are mutually exclusive.
+func collectParams(cmd *cobra.Command, jsonInput string, bindings map[string]*paramBinding, schema OperationSchema) (map[string]any, error) {
+	jsonSet := cmd.Flags().Changed("json")
 
-	if jsonInput != "" {
+	var setParamFlags []string
+	for _, b := range bindings {
+		if cmd.Flags().Changed(b.flagName) {
+			setParamFlags = append(setParamFlags, "--"+b.flagName)
+		}
+	}
+	sort.Strings(setParamFlags)
+
+	if jsonSet && len(setParamFlags) > 0 {
+		writeStderrJSON(map[string]any{
+			"error":   "validation_error",
+			"message": fmt.Sprintf("--json cannot be combined with parameter flags (%s)", strings.Join(setParamFlags, ", ")),
+			"hint":    "pass parameters either as --json or as individual flags, not both",
+		})
+		osExit(client.ExitValidation)
+		return nil, fmt.Errorf("validation error")
+	}
+
+	params := map[string]any{}
+
+	if jsonSet {
 		raw, err := resolveJSONInput(jsonInput)
 		if err != nil {
 			writeStderrError("input_error", err.Error())
@@ -119,10 +194,28 @@ func parseAndValidate(jsonInput, idFlag string, schema OperationSchema) (map[str
 			osExit(client.ExitValidation)
 			return nil, fmt.Errorf("invalid JSON")
 		}
-	}
-
-	if idFlag != "" {
-		params["id"] = idFlag
+	} else {
+		for key, b := range bindings {
+			if !cmd.Flags().Changed(b.flagName) {
+				continue
+			}
+			switch b.kind {
+			case "string":
+				params[key] = *b.strVal
+			case "bool", "boolean":
+				params[key] = *b.boolVal
+			case "int", "integer":
+				params[key] = *b.intVal
+			case "number":
+				params[key] = *b.floatVal
+			case "array":
+				arr := make([]any, len(*b.sliceVal))
+				for i, v := range *b.sliceVal {
+					arr[i] = v
+				}
+				params[key] = arr
+			}
+		}
 	}
 
 	if err := validateParams(params, schema); err != nil {

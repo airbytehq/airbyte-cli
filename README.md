@@ -94,14 +94,40 @@ Env vars take precedence over the file when both are present, so they're useful 
 airbyte <resource> <operation> [flags]
 ```
 
-All parameters are passed as JSON via `--json`, or as a resource ID via `--id`. Output is JSON by default; `--format table` produces a human-readable table.
+Parameters can be supplied two ways: as a single JSON document via `--json`, or as individual flags (`--workspace foo --name bar`). The two modes are **mutually exclusive** — passing both is an error. Output is JSON by default; `--format table` produces a human-readable table.
+
+### Two ways to pass parameters
+
+**1. Individual flags (recommended for humans)** — every parameter in the operation's schema is exposed as a `--<param>` flag, with snake_case keys converted to kebab-case (e.g. `select_fields` → `--select-fields`):
+
+```bash
+airbyte connectors describe --workspace default --name hubspot
+airbyte connectors execute --workspace default --name hubspot \
+  --entity contacts --action read \
+  --select-fields id,email,name
+```
+
+Run `airbyte <resource> <operation> --help` to see the available flags for any command.
+
+**2. JSON (recommended for agents and complex payloads)** — pass the whole parameter set as a JSON object:
+
+```bash
+airbyte connectors execute --json '{
+  "workspace": "default",
+  "name": "hubspot",
+  "entity": "contacts",
+  "action": "read",
+  "select_fields": ["id", "email", "name"]
+}'
+```
+
+Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the only way to pass nested objects (e.g. the `params` field on `connectors execute`).
 
 ### Global flags
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `--json` | Inline JSON parameters (or `@filename` to load from a file) | -- |
-| `--id` | Convenience flag for resource ID | -- |
+| `--json` | Inline JSON parameters (or `@filename` to load from a file). Cannot be combined with per-parameter flags. | -- |
 | `--format` | Output format: `json` or `table` | `json` |
 | `--describe` | Print the operation's parameter schema and exit | `false` |
 | `--output, -o` | Write output to a file instead of stdout | -- |
