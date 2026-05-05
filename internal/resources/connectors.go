@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -187,8 +188,8 @@ func connectorsListAvailable(ctx context.Context, c *client.Client, params map[s
 
 func connectorsDescribe(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	id, _ := params["id"].(string)
-	path := fmt.Sprintf("/api/v1/integrations/connectors/%s", id)
-	execPath := fmt.Sprintf("/api/v1/integrations/connectors/%s/execute", id)
+	path := connectorPath(id)
+	execPath := path + "/execute"
 
 	type result struct {
 		data json.RawMessage
@@ -227,12 +228,15 @@ func connectorsDescribe(ctx context.Context, c *client.Client, params map[string
 		return nil, fmt.Errorf("parsing connector: %w", err)
 	}
 
-	if describeResult.err == nil {
-		var schema any
-		if err := json.Unmarshal(describeResult.data, &schema); err == nil {
-			connector["schema"] = schema
-		}
+	if describeResult.err != nil {
+		return nil, describeResult.err
 	}
+
+	var schema any
+	if err := json.Unmarshal(describeResult.data, &schema); err != nil {
+		return nil, fmt.Errorf("parsing connector schema: %w", err)
+	}
+	connector["schema"] = schema
 
 	return connector, nil
 }
@@ -256,7 +260,7 @@ func connectorsExecute(ctx context.Context, c *client.Client, params map[string]
 		body["exclude_fields"] = ef
 	}
 
-	execPath := fmt.Sprintf("/api/v1/integrations/connectors/%s/execute", id)
+	execPath := connectorPath(id) + "/execute"
 	raw, err := c.Post(ctx, execPath, body)
 	if err != nil {
 		return nil, err
@@ -266,10 +270,14 @@ func connectorsExecute(ctx context.Context, c *client.Client, params map[string]
 
 func connectorsDelete(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	id, _ := params["id"].(string)
-	path := fmt.Sprintf("/api/v1/integrations/connectors/%s", id)
+	path := connectorPath(id)
 	raw, err := c.Delete(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	return raw, nil
+}
+
+func connectorPath(id string) string {
+	return "/api/v1/integrations/connectors/" + url.PathEscape(id)
 }

@@ -21,8 +21,9 @@ type Operation struct {
 }
 
 type OperationHooks struct {
-	PreRun      func(ctx context.Context, client *client.Client, params map[string]any) (map[string]any, error)
-	Interactive func(ctx context.Context, client *client.Client, params map[string]any) (any, error)
+	PreRun               func(ctx context.Context, client *client.Client, params map[string]any) (map[string]any, error)
+	Interactive          func(ctx context.Context, client *client.Client, params map[string]any) (any, error)
+	AllowUnauthenticated bool
 }
 
 type OperationSchema struct {

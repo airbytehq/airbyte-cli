@@ -53,7 +53,7 @@ The CLI uses a **resource-registry** pattern:
 | --- | --- |
 | `types.go` | `Resource` interface, `Operation` struct, `OperationSchema`, `ParamSchema`, `OperationHooks` |
 | `registry.go` | Thread-safe global registry: `Register()`, `All()`, `Get()`, `Reset()` |
-| `builder.go` | Converts registered resources into Cobra commands with `--json`, `--id`, `--describe`, file input (`@filename`), parameter validation, and hook execution |
+| `builder.go` | Converts registered resources into Cobra commands with per-parameter flags, `--json`, `--describe`, file input (`@filename`), parameter validation, and hook execution |
 
 ### Resources (`internal/resources/`)
 
@@ -95,7 +95,7 @@ The CLI uses a **resource-registry** pattern:
 | `connectors` | `create` | Interactive credential flow | `workspace`, `template_name` or `template_id` |
 | `connectors` | `delete` | Delete a connector | `name`+`workspace` or `--id` |
 
-### Global Flags
+### Common Flags
 
 | Flag | Description | Default |
 | --- | --- | --- |
@@ -103,8 +103,8 @@ The CLI uses a **resource-registry** pattern:
 | `--describe` | Print operation schema and exit (do not execute) | `false` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
-| `--json` | Inline JSON parameters | -- |
-| `--id` | Convenience flag for resource ID | -- |
+| `--json` | Operation flag for inline JSON parameters; mutually exclusive with per-parameter flags | -- |
+| `--<param>` | Per-parameter operation flags generated from each scalar/array schema parameter, e.g. `--id`, `--workspace`, `--select-fields` | -- |
 
 ## Credential Security
 

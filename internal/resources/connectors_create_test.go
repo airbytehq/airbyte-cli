@@ -308,26 +308,6 @@ func TestConnectorsCreateInteractive_CredentialFlowFailed(t *testing.T) {
 	}
 }
 
-func TestEqualFold(t *testing.T) {
-	tests := []struct {
-		a, b string
-		want bool
-	}{
-		{"Salesforce", "salesforce", true},
-		{"SALESFORCE", "salesforce", true},
-		{"salesforce", "salesforce", true},
-		{"Sales", "salesforce", false},
-		{"", "", true},
-		{"a", "b", false},
-	}
-	for _, tt := range tests {
-		got := equalFold(tt.a, tt.b)
-		if got != tt.want {
-			t.Errorf("equalFold(%q, %q) = %v, want %v", tt.a, tt.b, got, tt.want)
-		}
-	}
-}
-
 func TestCredentialTimeout(t *testing.T) {
 	t.Setenv("AIRBYTE_CREDENTIAL_TIMEOUT", "120")
 	if got := credentialTimeout(); got != 120*time.Second {
@@ -342,6 +322,18 @@ func TestCredentialTimeout(t *testing.T) {
 	t.Setenv("AIRBYTE_CREDENTIAL_TIMEOUT", "invalid")
 	if got := credentialTimeout(); got != defaultCredentialTimeout {
 		t.Errorf("expected default %v for invalid input, got %v", defaultCredentialTimeout, got)
+	}
+}
+
+func TestCredentialURL(t *testing.T) {
+	got, err := credentialURL("https://cloud.airbyte.com/base", "session/1", "tok&en")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	want := "https://cloud.airbyte.com/base/embedded-widget/credentials?session_id=session%2F1&token=tok%26en"
+	if got != want {
+		t.Errorf("credentialURL = %q, want %q", got, want)
 	}
 }
 

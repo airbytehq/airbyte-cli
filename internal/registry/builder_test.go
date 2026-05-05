@@ -276,8 +276,8 @@ func TestMissingRequiredParamReturnsValidationError(t *testing.T) {
 		t.Fatalf("parsing error output: %v (output: %s)", err, buf.String())
 	}
 
-	if result["error"] != "validation_error" {
-		t.Errorf("expected error 'validation_error', got %v", result["error"])
+	if result["type"] != "validation_error" {
+		t.Errorf("expected type 'validation_error', got %v", result["type"])
 	}
 
 	fields, ok := result["fields"].(map[string]any)
@@ -603,8 +603,8 @@ func TestNilClientReturnsAuthError(t *testing.T) {
 		t.Fatalf("parsing error output: %v (output: %s)", err, buf.String())
 	}
 
-	if result["error"] != "auth_error" {
-		t.Errorf("expected error 'auth_error', got %v", result["error"])
+	if result["type"] != "auth_error" {
+		t.Errorf("expected type 'auth_error', got %v", result["type"])
 	}
 }
 
@@ -772,8 +772,8 @@ func TestJSONAndParamFlagsConflict(t *testing.T) {
 	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
 		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
 	}
-	if result["error"] != "validation_error" {
-		t.Errorf("expected error='validation_error', got %v", result["error"])
+	if result["type"] != "validation_error" {
+		t.Errorf("expected type='validation_error', got %v", result["type"])
 	}
 	msg, _ := result["message"].(string)
 	if !strings.Contains(msg, "--name") || !strings.Contains(msg, "--json") {
@@ -807,6 +807,245 @@ func TestParamFlagsMissingRequired(t *testing.T) {
 
 	_ = w.Close()
 	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+}
+
+func TestJSONUnknownParamReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do", "--json", `{"workspace":"prod","extra":"bad"}`})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not have been called with unknown params")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
+	}
+
+	fields, ok := result["fields"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected fields map, got %T", result["fields"])
+	}
+	if fields["extra"] != "unknown parameter" {
+		t.Errorf("expected unknown parameter error, got %v", fields["extra"])
+	}
+}
+
+func TestJSONWrongTypeReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do", "--json", `{"workspace":"prod","limit":"42"}`})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not have been called with wrong param types")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
+	}
+
+	fields, ok := result["fields"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected fields map, got %T", result["fields"])
+	}
+	if fields["limit"] != "expected integer" {
+		t.Errorf("expected integer type error, got %v", fields["limit"])
+	}
+}
+
+func TestInteractiveHookRequiresAuthByDefault(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	interactiveCalled := false
+	Register(newMockResource("connectors", "Connectors",
+		Operation{
+			Name: "create",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Hooks: OperationHooks{
+				Interactive: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+					interactiveCalled = true
+					return map[string]string{"status": "ok"}, nil
+				},
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	Build(root, nil, &stubFlags{format: "json"})
+	root.SetArgs([]string{"connectors", "create"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	if *exitCode != client.ExitAuth {
+		t.Fatalf("expected exit code %d, got %d", client.ExitAuth, *exitCode)
+	}
+	if interactiveCalled {
+		t.Fatal("Interactive should not be called without credentials by default")
+	}
+}
+
+func TestInteractiveHookCanAllowUnauthenticated(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	interactiveCalled := false
+	Register(newMockResource("auth", "Auth",
+		Operation{
+			Name: "login",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Hooks: OperationHooks{
+				Interactive: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+					interactiveCalled = true
+					return map[string]string{"status": "ok"}, nil
+				},
+				AllowUnauthenticated: true,
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, nil, &stubFlags{format: "json", output: outFile})
+	root.SetArgs([]string{"auth", "login"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !interactiveCalled {
+		t.Fatal("Interactive should be called when unauthenticated access is allowed")
+	}
+}
+
+func TestParamFlagCollisionReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name: "do",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"json": {Type: "string", Required: false, Description: "Reserved"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				t.Fatal("Run should not be called when schema flags conflict")
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+}
+
+func TestParamFlagDuplicateNameReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name: "do",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"foo_bar": {Type: "string", Required: false, Description: "One"},
+					"foo-bar": {Type: "string", Required: false, Description: "Two"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				t.Fatal("Run should not be called when generated flags conflict")
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
 
 	if *exitCode != client.ExitValidation {
 		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)

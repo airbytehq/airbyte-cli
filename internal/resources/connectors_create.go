@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
@@ -45,7 +47,7 @@ func connectorsCreateInteractive(ctx context.Context, c *client.Client, params m
 		return nil, err
 	}
 
-	templateRaw, err := c.Get(ctx, fmt.Sprintf("/api/v1/integrations/templates/sources/%s", templateID), nil)
+	templateRaw, err := c.Get(ctx, "/api/v1/integrations/templates/sources/"+url.PathEscape(templateID), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +99,10 @@ func connectorsCreateInteractive(ctx context.Context, c *client.Client, params m
 		return nil, fmt.Errorf("parsing session: %w", err)
 	}
 
-	credURL := fmt.Sprintf("%s/embedded-widget/credentials?session_id=%s&token=%s",
-		webAppBaseURL(), session.SessionID, widgetToken.Token)
+	credURL, err := credentialURL(webAppBaseURL(), session.SessionID, widgetToken.Token)
+	if err != nil {
+		return nil, err
+	}
 
 	startResult := map[string]string{
 		"credentials_url": credURL,
@@ -139,7 +143,7 @@ func connectorsCreateInteractive(ctx context.Context, c *client.Client, params m
 
 		time.Sleep(delay)
 
-		pollURL := fmt.Sprintf("/api/v1/internal/mcp_oauth/sessions/%s", session.SessionID)
+		pollURL := "/api/v1/internal/mcp_oauth/sessions/" + url.PathEscape(session.SessionID)
 		pollRaw, err := c.Get(ctx, pollURL, nil)
 		if err != nil {
 			continue
@@ -154,7 +158,7 @@ func connectorsCreateInteractive(ctx context.Context, c *client.Client, params m
 		}
 
 		if pollResult.Status == "completed" {
-			return createConnectorWithCredentials(ctx, c, templateID, workspaceName, templateRaw, pollResult.Credentials)
+			return createConnectorWithCredentials(ctx, c, templateID, workspaceName, pollResult.Credentials)
 		}
 
 		if pollResult.Status == "failed" {
@@ -201,7 +205,7 @@ func resolveTemplateID(ctx context.Context, c *client.Client, params map[string]
 	}
 
 	for _, t := range resp.Data {
-		if equalFold(t.Name, name) {
+		if strings.EqualFold(t.Name, name) {
 			return t.ID, nil
 		}
 	}
@@ -231,7 +235,7 @@ func resolveWorkspaceID(ctx context.Context, c *client.Client, name string) (str
 	}
 
 	for _, ws := range resp.Data {
-		if equalFold(ws.Name, name) {
+		if strings.EqualFold(ws.Name, name) {
 			return ws.ID, nil
 		}
 	}
@@ -242,12 +246,7 @@ func resolveWorkspaceID(ctx context.Context, c *client.Client, name string) (str
 	)
 }
 
-func createConnectorWithCredentials(ctx context.Context, c *client.Client, templateID, workspaceName string, templateRaw, credentials json.RawMessage) (any, error) {
-	var templateBody map[string]any
-	if err := json.Unmarshal(templateRaw, &templateBody); err != nil {
-		return nil, fmt.Errorf("parsing template for connector creation: %w", err)
-	}
-
+func createConnectorWithCredentials(ctx context.Context, c *client.Client, templateID, workspaceName string, credentials json.RawMessage) (any, error) {
 	var creds map[string]any
 	if err := json.Unmarshal(credentials, &creds); err != nil {
 		return nil, fmt.Errorf("parsing credentials: %w", err)
@@ -266,27 +265,17 @@ func createConnectorWithCredentials(ctx context.Context, c *client.Client, templ
 	return raw, nil
 }
 
-func equalFold(a, b string) bool {
-	return len(a) == len(b) && foldEqual(a, b)
-}
-
-func foldEqual(a, b string) bool {
-	for i := 0; i < len(a); i++ {
-		ca, cb := a[i], b[i]
-		if ca == cb {
-			continue
-		}
-		if 'A' <= ca && ca <= 'Z' {
-			ca += 'a' - 'A'
-		}
-		if 'A' <= cb && cb <= 'Z' {
-			cb += 'a' - 'A'
-		}
-		if ca != cb {
-			return false
-		}
+func credentialURL(baseURL, sessionID, token string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", fmt.Errorf("parsing web app URL: %w", err)
 	}
-	return true
+	u.Path = strings.TrimRight(u.Path, "/") + "/embedded-widget/credentials"
+	q := u.Query()
+	q.Set("session_id", sessionID)
+	q.Set("token", token)
+	u.RawQuery = q.Encode()
+	return u.String(), nil
 }
 
 func webAppBaseURL() string {
