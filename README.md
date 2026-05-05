@@ -1,2 +1,196 @@
-# cli
-Airbyte CLI 
+# airbyte
+
+A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents.
+
+The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `--describe`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
+
+## What it is
+
+- **Resource-driven**: commands aren't hand-written Cobra trees. Resources are declared as Go structs in `internal/resources/`, registered into a global registry, and dynamically materialized into Cobra commands at startup.
+- **Self-describing**: any command will print its full parameter schema with `--describe`, so callers (especially LLMs) can discover required fields without guessing.
+- **Minimal**: only two external dependencies (Cobra + pflag). Everything else is stdlib.
+- **Embedded skills**: usage guidance for common workflows (auth, connectors, workspaces, discovery) is compiled into the binary and accessible via `airbyte skills`.
+
+See `AGENTS.md` for the full architecture reference and `CONTEXT.md` for the agent-facing usage guide.
+
+## How it works
+
+```
+main.go
+  ├── config.Load()              # read env vars (AIRBYTE_API_HOST, etc.)
+  ├── auth.ResolveCredentials()  # env first, then ~/.airbyte/credentials
+  ├── auth.NewTokenManager()     # OAuth token caching + auto-refresh
+  ├── client.New()               # HTTP client w/ retry + structured errors
+  ├── resources.RegisterAll()    # register every Resource into the registry
+  ├── registry.Build()           # convert registry → Cobra command tree
+  └── cmd.Execute()              # dispatch
+```
+
+| Package | Purpose |
+| --- | --- |
+| `cmd/` | Root Cobra command, persistent flags, version |
+| `internal/registry/` | `Resource` interface, dynamic command builder |
+| `internal/resources/` | Resource implementations + embedded skill docs |
+| `internal/client/` | HTTP client (3x exponential-backoff retry on 429/5xx, 30s timeout) |
+| `internal/auth/` | Credential resolution, OAuth token caching |
+| `internal/config/` | Environment variable loader |
+| `internal/output/` | JSON and table formatters |
+
+The HTTP client retries 429/502/503/504 with backoff and surfaces non-retryable errors (400/401/403/404/422) as `APIError` values that map to deterministic exit codes.
+
+## Install
+
+```bash
+git clone https://github.com/airbytehq/airbyte-cli.git
+cd airbyte-cli
+make build         # builds ./airbyte
+# or
+make install       # installs to $GOBIN
+```
+
+Build directly without the Makefile:
+
+```bash
+go build -o airbyte .
+```
+
+## Configure
+
+Credentials can be supplied via environment variables or a credentials file at `~/.airbyte/credentials` (JSON, `0600` permissions).
+
+### Environment variables
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
+| `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
+| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (optional) |
+| `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://cloud.airbyte.com` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `300` |
+
+### Credentials file
+
+```json
+{
+  "client_id": "your-client-id",
+  "client_secret": "your-client-secret",
+  "organization_id": "your-org-id"
+}
+```
+
+## Usage
+
+```bash
+airbyte <resource> <operation> [flags]
+```
+
+All parameters are passed as JSON via `--json`, or as a resource ID via `--id`. Output is JSON by default; `--format table` produces a human-readable table.
+
+### Global flags
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--json` | Inline JSON parameters (or `@filename` to load from a file) | -- |
+| `--id` | Convenience flag for resource ID | -- |
+| `--format` | Output format: `json` or `table` | `json` |
+| `--describe` | Print the operation's parameter schema and exit | `false` |
+| `--output, -o` | Write output to a file instead of stdout | -- |
+| `--verbose, -v` | Enable debug logging | `false` |
+
+### Discovering commands
+
+```bash
+airbyte --help                              # list resources
+airbyte connectors --help                   # list operations
+airbyte connectors execute --describe       # show parameter schema
+```
+
+### Command surface
+
+| Resource | Operation | Description |
+| --- | --- | --- |
+| `enrollment` | `status` | Check account enrollment & provisioning |
+| `organizations` | `list` | List organizations |
+| `workspaces` | `list` | List/filter workspaces |
+| `connectors` | `list` | List connectors in a workspace |
+| `connectors` | `list-available` | List connector templates |
+| `connectors` | `describe` | Show a connector's entities and actions |
+| `connectors` | `execute` | Run an action on a connector |
+| `connectors` | `create` | Interactive browser-based credential flow |
+| `connectors` | `delete` | Delete a connector |
+| `skills` | `list` / `show` | Read embedded usage guides |
+
+### Examples
+
+```bash
+# Verify enrollment
+airbyte enrollment status
+
+# Find a workspace
+airbyte workspaces list --format table
+
+# Discover what a connector can do
+airbyte connectors describe --json '{"workspace": "default", "name": "hubspot"}'
+
+# Read data, limiting fields to keep the response small
+airbyte connectors execute --json '{
+  "workspace": "default",
+  "name": "hubspot",
+  "entity": "contacts",
+  "action": "read",
+  "select_fields": ["id", "email", "name"]
+}'
+
+# Create a new connector (opens a browser for secure credential entry)
+airbyte connectors create --json '{
+  "workspace": "default",
+  "template_name": "source-hubspot"
+}'
+
+# Load a complex payload from a file
+airbyte connectors execute --json @params.json
+```
+
+## Credentials are entered in the browser, not the CLI
+
+The CLI never accepts API keys, tokens, or passwords as command-line parameters. `connectors create` opens a browser-based widget, runs an OAuth session, polls until the user submits, then creates the connector with the returned credentials. If you're an agent, do not ask the user to paste secrets — start the credential flow.
+
+## Errors and exit codes
+
+All errors are emitted as JSON on stderr.
+
+```json
+{"type": "not_found", "message": "...", "status_code": 404, "retryable": false}
+```
+
+| Exit code | Meaning | HTTP |
+| --- | --- | --- |
+| `0` | Success | 2xx |
+| `1` | General error | 500, others |
+| `2` | Authentication error | 401, 403 |
+| `3` | Not found | 404 |
+| `4` | Validation error | 400, 422 |
+
+When you see a validation error, re-run the command with `--describe` to inspect the expected schema.
+
+## Skills
+
+Skill documents are markdown files compiled into the binary via `//go:embed`. They provide task-oriented guidance for agents.
+
+```bash
+airbyte skills list
+airbyte skills show --json '{"name": "connectors"}'
+```
+
+Available skills: `getting-started`, `connectors`, `workspaces`, `discovery`.
+
+## Develop
+
+```bash
+go build ./...
+go test ./...
+go vet ./...
+```
+
+To add a new resource: implement the `Resource` interface in `internal/resources/<name>.go`, register it in `register.go`, and add tests using the existing `newTestTokenServer()` / `newTestClient()` helpers. See `AGENTS.md` for the full guide.
