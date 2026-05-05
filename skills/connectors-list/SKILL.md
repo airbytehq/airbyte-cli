@@ -30,6 +30,24 @@ airbyte connectors list                              # falls back to workspace="
 - `connectors describe` — inspect a specific connector's entities and actions.
 - `connectors create` — install a new connector from a template.
 
+## Filtering output
+
+> [!IMPORTANT]
+> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
+
+Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
+
+```
+airbyte connectors list --fields id,name              # short form
+airbyte connectors list --fields data.id,data.name    # long form
+```
+
+If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
+
+```
+airbyte connectors list --fields data.id,next
+```
+
 ## Hints
 
 - Names listed here are case-insensitive but must match exactly when used elsewhere.

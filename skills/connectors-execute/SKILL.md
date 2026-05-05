@@ -33,7 +33,36 @@ airbyte connectors execute --json '{
 
 ## Limiting response size
 
-For large reads, restrict fields to keep output manageable:
+> [!IMPORTANT]
+> When you already know which fields you need, **always pass both `select_fields` (API-side) and `--fields` (CLI-side)**. `execute` reads can be huge — unfiltered responses waste both bandwidth and context window.
+
+Two complementary mechanisms:
+
+- **`select_fields` / `exclude_fields` (API-side)** — passed to the source connector to reduce upstream work and bandwidth.
+- **`--fields` (client-side)** — shapes the JSON the CLI prints to stdout, after the API responds.
+
+For row-level reads (entities like `contacts`, `users`), responses come wrapped in `{"data": [...]}`. Both forms below work — the CLI auto-broadcasts when no path matches a top-level key:
+
+```bash
+# Short form — auto-broadcasts through the data wrapper
+airbyte connectors execute --workspace default --name hubspot \
+  --entity contacts --action read --fields id,email
+
+# Long form — explicit dotted paths
+airbyte connectors execute --workspace default --name hubspot \
+  --entity contacts --action read --fields data.id,data.email
+```
+
+If you want top-level fields like `next` (cursor) AND row-level fields, you must use the long form for the row-level paths — once any path matches top-level, auto-broadcast is disabled:
+
+```bash
+airbyte connectors execute --workspace default --name hubspot \
+  --entity contacts --action read \
+  --select-fields id,email,name \
+  --fields data.id,data.email,next
+```
+
+For large reads, restrict API-side fields to keep output manageable:
 
 ```
 airbyte connectors execute --json '{

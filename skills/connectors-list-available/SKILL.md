@@ -25,6 +25,18 @@ airbyte connectors list-available --format table
 airbyte connectors create --json '{"workspace": "my-workspace", "name": "salesforce"}'
 ```
 
+## Filtering output
+
+> [!IMPORTANT]
+> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
+
+Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
+
+```
+airbyte connectors list-available --fields id,name              # short form
+airbyte connectors list-available --fields data.id,data.name    # long form
+```
+
 ## Hints
 
 - The list is filtered to what your account has access to — it will not show every connector that exists in Airbyte's catalog.

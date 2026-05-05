@@ -24,6 +24,24 @@ airbyte workspaces list --json '{"status": "active"}'
 
 Run `airbyte workspaces list --describe` to see the full parameter schema.
 
+## Filtering output
+
+> [!IMPORTANT]
+> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
+
+Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
+
+```
+airbyte workspaces list --fields name,status              # short form
+airbyte workspaces list --fields data.name,data.status    # long form
+```
+
+If you mix top-level and row-level paths, use the long form for row-level fields:
+
+```
+airbyte workspaces list --fields data.name,next
+```
+
 ## Discovery flow
 
 1. `airbyte workspaces list --format table` — see all workspaces.

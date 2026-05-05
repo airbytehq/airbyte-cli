@@ -22,6 +22,7 @@ type stubFlags struct {
 	format   string
 	output   string
 	describe bool
+	fields   []string
 }
 
 func (s *stubFlags) GetFormat() string {
@@ -34,6 +35,10 @@ func (s *stubFlags) GetOutput() string {
 
 func (s *stubFlags) GetDescribe() bool {
 	return s.describe
+}
+
+func (s *stubFlags) GetFields() []string {
+	return s.fields
 }
 
 func newTestRoot() *cobra.Command {
@@ -778,6 +783,130 @@ func TestJSONAndParamFlagsConflict(t *testing.T) {
 	msg, _ := result["message"].(string)
 	if !strings.Contains(msg, "--name") || !strings.Contains(msg, "--json") {
 		t.Errorf("expected message to mention --json and --name; got %q", msg)
+	}
+}
+
+func TestFieldsFilterAppliedToOutput(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "list",
+			Description: "List items",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return map[string]any{
+					"data": []any{
+						map[string]any{"id": "1", "name": "alpha", "secret": "drop"},
+						map[string]any{"id": "2", "name": "beta", "secret": "drop"},
+					},
+					"next": "cursor-1",
+				}, nil
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: outFile, fields: []string{"data.id", "next"}}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"items", "list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parsing output: %v (raw: %s)", err, string(data))
+	}
+
+	rows, ok := got["data"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("expected 2 rows under 'data', got %v", got["data"])
+	}
+	for i, row := range rows {
+		m, ok := row.(map[string]any)
+		if !ok {
+			t.Fatalf("row %d not a map: %T", i, row)
+		}
+		if _, hasSecret := m["secret"]; hasSecret {
+			t.Errorf("row %d still contains 'secret' after filter: %v", i, m)
+		}
+		if _, hasName := m["name"]; hasName {
+			t.Errorf("row %d still contains 'name' after filter: %v", i, m)
+		}
+		if m["id"] == nil {
+			t.Errorf("row %d missing 'id' after filter", i)
+		}
+	}
+	if got["next"] != "cursor-1" {
+		t.Errorf("expected 'next' kept, got %v", got["next"])
+	}
+}
+
+func TestFieldsFilterDoesNotApplyToErrors(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "fail",
+			Description: "Always fail",
+			Schema:      OperationSchema{Params: map[string]ParamSchema{}},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return nil, &client.APIError{
+					Type:       "not_found",
+					Message:    "missing",
+					StatusCode: 404,
+				}
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	// fields filter that would, if applied, drop the error fields.
+	flags := &stubFlags{format: "json", fields: []string{"nonexistent"}}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"items", "fail"})
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitNotFound {
+		t.Fatalf("expected exit %d, got %d", client.ExitNotFound, *exitCode)
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var errPayload map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &errPayload); err != nil {
+		t.Fatalf("parsing stderr: %v (raw: %s)", err, buf.String())
+	}
+	if errPayload["type"] != "not_found" {
+		t.Errorf("error payload was filtered or malformed: %v", errPayload)
+	}
+	if errPayload["message"] != "missing" {
+		t.Errorf("error payload missing message field: %v", errPayload)
 	}
 }
 

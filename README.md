@@ -132,6 +132,31 @@ Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the
 | `--describe` | Print the operation's parameter schema and exit | `false` |
 | `--output, -o` | Write output to a file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
+| `--fields` | Filter the response to only the listed fields. Comma-separated, dotted paths (e.g. `data.id,data.name`). Applied client-side, after the API responds. Errors are not filtered. | -- |
+
+### Filtering output with `--fields`
+
+`--fields` shapes the response payload after it returns from the API. Paths use dotted notation; when a path crosses an array, the remaining segments are applied to every element ("array broadcast"):
+
+```bash
+# Both of these work — list responses are wrapped in {"data": [...]} and the
+# CLI auto-broadcasts when no path matches a top-level key.
+airbyte organizations list --fields id,organization_name
+airbyte organizations list --fields data.id,data.organization_name
+
+# Mixed paths require explicit prefixes — the auto-broadcast only fires
+# when *no* path matches a top-level key:
+airbyte connectors list --fields data.id,data.name,next
+```
+
+**Path resolution rules:**
+
+1. **Strict match first.** Paths are matched against top-level keys of the response.
+2. **Smart wrapper fallback.** When *no* paths match top-level keys AND the response has *exactly one* top-level array (e.g. `{"data": [...]}`), each path is implicitly prefixed with that wrapper's key and re-applied. Lets you write `--fields id,name` instead of `--fields data.id,data.name` for list-style responses.
+3. **Mixed cases stay strict.** If even one path matches top-level, no rewrite happens — pass explicit dotted paths if you also want row-level fields.
+4. **Missing paths are dropped silently.** Errors are never filtered.
+
+This is **client-side**: the full payload still travels from the API to the CLI. To reduce upstream work, `connectors execute` separately accepts `select_fields` / `exclude_fields` which are sent to the source connector. The two are complementary — combine them when you want both bandwidth savings and a clean output shape.
 
 ### Discovering commands
 
