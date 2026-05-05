@@ -1,1 +1,41 @@
+# Binaries
+airbyte
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test & coverage
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Go workspace & vendoring
+go.work
+go.work.sum
+vendor/
+
+# Profiling
+*.prof
+*.pprof
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Local env / credentials
+.env
+.env.local
+.airbyte/
+credentials
