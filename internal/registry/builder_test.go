@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
@@ -604,5 +605,210 @@ func TestNilClientReturnsAuthError(t *testing.T) {
 
 	if result["error"] != "auth_error" {
 		t.Errorf("expected error 'auth_error', got %v", result["error"])
+	}
+}
+
+// registerMixedTypeOp registers a mock operation with one parameter of each
+// supported scalar type plus an array — used by several flag-mode tests.
+func registerMixedTypeOp(captured *map[string]any) {
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name:        "do",
+			Description: "Do thing",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"workspace":     {Type: "string", Required: true, Description: "Workspace name"},
+					"name":          {Type: "string", Required: false, Description: "Thing name"},
+					"limit":         {Type: "integer", Required: false, Description: "Limit"},
+					"dry_run":       {Type: "bool", Required: false, Description: "Dry run"},
+					"select_fields": {Type: "array", Required: false, Description: "Fields"},
+					"params":        {Type: "object", Required: false, Description: "Free-form payload"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				*captured = params
+				return map[string]string{"ok": "yes"}, nil
+			},
+		},
+	))
+}
+
+func TestParamFlagsString(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+
+	root.SetArgs([]string{"things", "do", "--workspace", "prod", "--name", "thing-1"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if captured["workspace"] != "prod" {
+		t.Errorf("expected workspace='prod', got %v", captured["workspace"])
+	}
+	if captured["name"] != "thing-1" {
+		t.Errorf("expected name='thing-1', got %v", captured["name"])
+	}
+}
+
+func TestParamFlagsTypeBindings(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--workspace", "prod",
+		"--limit", "42",
+		"--dry-run",
+		"--select-fields", "id,name,email",
+	})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if captured["limit"] != 42 {
+		t.Errorf("expected limit=42 (int), got %v (%T)", captured["limit"], captured["limit"])
+	}
+	if captured["dry_run"] != true {
+		t.Errorf("expected dry_run=true, got %v", captured["dry_run"])
+	}
+	arr, ok := captured["select_fields"].([]any)
+	if !ok {
+		t.Fatalf("expected select_fields []any, got %T", captured["select_fields"])
+	}
+	if len(arr) != 3 || arr[0] != "id" || arr[2] != "email" {
+		t.Errorf("unexpected select_fields contents: %v", arr)
+	}
+}
+
+func TestParamFlagsKebabCase(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: filepath.Join(t.TempDir(), "out.json")})
+
+	cmd, _, _ := root.Find([]string{"things", "do"})
+	if cmd.Flags().Lookup("dry-run") == nil {
+		t.Error("expected --dry-run flag (kebab-case for dry_run)")
+	}
+	if cmd.Flags().Lookup("select-fields") == nil {
+		t.Error("expected --select-fields flag (kebab-case for select_fields)")
+	}
+	if cmd.Flags().Lookup("dry_run") != nil {
+		t.Error("did not expect --dry_run (snake_case form)")
+	}
+}
+
+func TestObjectParamHasNoFlag(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	cmd, _, _ := root.Find([]string{"things", "do"})
+	if cmd.Flags().Lookup("params") != nil {
+		t.Error("did not expect a flag for object-typed param 'params' — must use --json")
+	}
+}
+
+func TestJSONAndParamFlagsConflict(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--json", `{"workspace": "prod"}`,
+		"--name", "thing-1",
+	})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not have been called when --json conflicts with flags")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
+	}
+	if result["error"] != "validation_error" {
+		t.Errorf("expected error='validation_error', got %v", result["error"])
+	}
+	msg, _ := result["message"].(string)
+	if !strings.Contains(msg, "--name") || !strings.Contains(msg, "--json") {
+		t.Errorf("expected message to mention --json and --name; got %q", msg)
+	}
+}
+
+func TestParamFlagsMissingRequired(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	_, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	// `workspace` is required but not provided via any mode.
+	root.SetArgs([]string{"things", "do", "--name", "thing-1"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
 	}
 }
