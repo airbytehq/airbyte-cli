@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/output"
 	"github.com/airbytehq/airbyte-cli/internal/registry"
 )
 
@@ -144,12 +145,21 @@ func connectorsCreateInteractive(ctx context.Context, c *client.Client, params m
 	timeout := credentialTimeout()
 	deadline := time.Now().Add(timeout)
 
+	// Render a TTY spinner while we wait. No-op when stderr isn't a terminal
+	// (piped, MCP, CI), so machine-readable streams stay clean.
+	spinner := output.NewSpinner(os.Stderr, timeout)
+	spinner.SetLabel("Waiting for credentials in browser")
+	spinner.Start(ctx)
+	defer spinner.Stop()
+
 	// Wait initialCredentialPollDelay before the first poll — the user is
 	// almost certainly still in the browser, and polling sooner just burns
 	// API calls. After that, poll on a fixed interval until deadline.
 	if err := waitFor(ctx, initialCredentialPollDelay, deadline); err != nil {
 		return nil, err
 	}
+
+	spinner.SetLabel("Polling for completion")
 
 	pollURL := "/api/v1/internal/mcp_oauth/sessions/" + url.PathEscape(session.SessionID)
 	for time.Now().Before(deadline) {
