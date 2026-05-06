@@ -296,7 +296,7 @@ func finalizeConnector(ctx context.Context, c *client.Client, workspaceName, ses
 		return map[string]any{
 			"id":         sess.SourceID,
 			"status":     "completed",
-			"message":    "Connector was already created for this session",
+			"message":    "Connector was created for this session",
 			"session_id": sessionID,
 		}, nil
 	}
