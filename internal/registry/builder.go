@@ -178,6 +178,9 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 		case "array":
 			b.sliceVal = new([]string)
 			cmd.Flags().StringSliceVar(b.sliceVal, flagName, nil, desc+" (comma-separated, or repeat the flag)")
+		case "object":
+			b.strVal = new(string)
+			cmd.Flags().StringVar(b.strVal, flagName, "", desc+" (JSON object)")
 		}
 		bindings[key] = b
 	}
@@ -187,7 +190,7 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 
 func supportsFlagType(typ string) bool {
 	switch typ {
-	case "string", "bool", "boolean", "int", "integer", "number", "array":
+	case "string", "bool", "boolean", "int", "integer", "number", "array", "object":
 		return true
 	default:
 		return false
@@ -260,6 +263,17 @@ func collectParams(cmd *cobra.Command, jsonInput string, bindings map[string]*pa
 					arr[i] = v
 				}
 				params[key] = arr
+			case "object":
+				var obj any
+				if err := json.Unmarshal([]byte(*b.strVal), &obj); err != nil {
+					writeStderrJSON(map[string]any{
+						"type":    "validation_error",
+						"message": fmt.Sprintf("--%s expected a JSON object: %s", b.flagName, err.Error()),
+					})
+					osExit(client.ExitValidation)
+					return nil, fmt.Errorf("invalid JSON in --%s", b.flagName)
+				}
+				params[key] = obj
 			}
 		}
 	}

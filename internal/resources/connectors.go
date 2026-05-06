@@ -139,10 +139,26 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 		return nil, fmt.Errorf("parsing connectors list: %w", err)
 	}
 
+	// Accept matches against the connector instance name, the template's
+	// display name, OR the template's slug — users may type any of these.
+	// Deduplicate so a single connector matched by multiple fields counts
+	// once.
+	seen := map[string]bool{}
 	var matches []string
 	for _, conn := range resp.Data {
-		if strings.EqualFold(conn.Name, name) {
-			matches = append(matches, conn.ID)
+		candidates := []string{
+			conn.Name,
+			conn.SummarizedSourceTemplate.Name,
+			conn.SummarizedSourceTemplate.ConnectorName,
+		}
+		for _, candidate := range candidates {
+			if candidate != "" && strings.EqualFold(candidate, name) {
+				if !seen[conn.ID] {
+					matches = append(matches, conn.ID)
+					seen[conn.ID] = true
+				}
+				break
+			}
 		}
 	}
 

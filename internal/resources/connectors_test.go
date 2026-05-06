@@ -112,6 +112,85 @@ func TestResolveConnectorID_DefaultsWorkspaceWhenMissing(t *testing.T) {
 	}
 }
 
+func TestResolveConnectorID_MatchesTemplateSlug(t *testing.T) {
+	// User typed the template slug ("twilio") but the connector instance's
+	// stored display name is "Twilio Default" — match should still succeed
+	// via summarized_source_template.connector_name.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{
+			"id": "conn-1",
+			"name": "Twilio Default",
+			"summarized_source_template": {"name": "Twilio", "connector_name": "twilio"}
+		}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	params := map[string]any{"name": "twilio", "workspace": "default"}
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "conn-1" {
+		t.Errorf("expected id=conn-1, got %v", result["id"])
+	}
+}
+
+func TestResolveConnectorID_MatchesTemplateDisplayName(t *testing.T) {
+	// User typed the template display name ("Twilio") — match via
+	// summarized_source_template.name.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{
+			"id": "conn-2",
+			"name": "Some Custom Label",
+			"summarized_source_template": {"name": "Twilio", "connector_name": "twilio"}
+		}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	params := map[string]any{"name": "Twilio", "workspace": "default"}
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "conn-2" {
+		t.Errorf("expected id=conn-2, got %v", result["id"])
+	}
+}
+
+func TestResolveConnectorID_NoDoubleCountWhenAllNamesMatch(t *testing.T) {
+	// One connector whose three name fields all happen to match the input
+	// must still count as a single match, not three.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{
+			"id": "conn-uniq",
+			"name": "twilio",
+			"summarized_source_template": {"name": "twilio", "connector_name": "twilio"}
+		}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	params := map[string]any{"name": "twilio", "workspace": "default"}
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "conn-uniq" {
+		t.Errorf("expected id=conn-uniq, got %v", result["id"])
+	}
+}
+
 func TestResolveConnectorID_FoundOne(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("workspace_name") != "my-workspace" {

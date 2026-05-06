@@ -6,15 +6,23 @@ package resources
 // update.
 
 // connectorLookupResponse is the minimal projection of GET /api/v1/integrations/connectors
-// used by resolveConnectorID. The full response has many more fields; we only
-// need id and name to map a user-supplied connector name to its ID.
+// used by resolveConnectorID. Connectors carry both an instance display name
+// (the user-set "Name" of this connector configuration) and the template's
+// slug (e.g. "twilio"). We surface all three name-like fields so name-based
+// lookup works whether the caller types the slug or the display name.
 type connectorLookupResponse struct {
 	Data []connectorLookupItem `json:"data"`
 }
 
 type connectorLookupItem struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID                       string                         `json:"id"`
+	Name                     string                         `json:"name"`
+	SummarizedSourceTemplate connectorLookupItemTemplateRef `json:"summarized_source_template"`
+}
+
+type connectorLookupItemTemplateRef struct {
+	Name          string `json:"name"`           // template display name, e.g. "Twilio"
+	ConnectorName string `json:"connector_name"` // template slug, e.g. "twilio"
 }
 
 // templateLookupResponse mirrors the structure returned by the templates list
