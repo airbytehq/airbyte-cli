@@ -1,0 +1,85 @@
+version: 2
+
+project_name: airbyte
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: airbyte
+    main: .
+    binary: airbyte
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+      - -X github.com/airbytehq/airbyte-cli/cmd.Version={{.Version}}
+      - -X github.com/airbytehq/airbyte-cli/cmd.Commit={{.Commit}}
+      - -X github.com/airbytehq/airbyte-cli/cmd.Date={{.Date}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - AGENTS.md
+      - CONTEXT.md
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+
+release:
+  draft: true
+  prerelease: auto
+  name_template: "v{{ .Version }}"
+
+# Homebrew formula generation. Goreleaser commits Formula/airbyte.rb to the
+# airbytehq/homebrew-tap repo on each non-prerelease release. Cross-repo write
+# requires a separate token (HOMEBREW_TAP_GITHUB_TOKEN) — the default
+# GITHUB_TOKEN issued by the workflow only has access to this repo.
+brews:
+  - name: airbyte
+    repository:
+      owner: airbytehq
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/airbytehq/airbyte-cli
+    description: Go CLI for the Airbyte API, designed for both humans and AI agents
+    license: MIT
+    install: |
+      bin.install "airbyte"
+    test: |
+      system "#{bin}/airbyte", "version"
+    skip_upload: auto # don't update the formula for prereleases (e.g. v0.1.0-rc1)
