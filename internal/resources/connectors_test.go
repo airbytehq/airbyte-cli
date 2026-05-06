@@ -1,14 +1,87 @@
 package resources
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
 )
+
+func TestApplyDefaultWorkspace_EmptyFallsBackToHardcoded(t *testing.T) {
+	// Nil client + no param + no configured default → "default" (the
+	// last-resort fallback).
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	params := map[string]any{}
+	got := applyDefaultWorkspace(nil, params)
+	if got != "default" {
+		t.Errorf("expected 'default', got %q", got)
+	}
+	if params["workspace"] != "default" {
+		t.Errorf("expected params['workspace']='default', got %v", params["workspace"])
+	}
+
+	var notice map[string]string
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
+		t.Fatalf("expected JSON notice on stderr, got %q (err: %v)", stderr.String(), err)
+	}
+	if notice["workspace"] != "default" {
+		t.Errorf("notice missing workspace=default: %v", notice)
+	}
+}
+
+func TestApplyDefaultWorkspace_UsesClientConfiguredDefault(t *testing.T) {
+	// Empty params + client with a configured default → use that default.
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	c := client.New("", "", "test", nil, client.WithDefaultWorkspace("my-workspace"))
+
+	params := map[string]any{}
+	got := applyDefaultWorkspace(c, params)
+	if got != "my-workspace" {
+		t.Errorf("expected 'my-workspace' (from settings), got %q", got)
+	}
+	if params["workspace"] != "my-workspace" {
+		t.Errorf("expected params['workspace']='my-workspace', got %v", params["workspace"])
+	}
+
+	var notice map[string]string
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
+		t.Fatalf("expected JSON notice on stderr, got %q", stderr.String())
+	}
+	if notice["workspace"] != "my-workspace" {
+		t.Errorf("notice should report the configured default; got %v", notice)
+	}
+}
+
+func TestApplyDefaultWorkspace_ExplicitParamWins(t *testing.T) {
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	c := client.New("", "", "test", nil, client.WithDefaultWorkspace("ignored"))
+
+	params := map[string]any{"workspace": "explicit-ws"}
+	got := applyDefaultWorkspace(c, params)
+	if got != "explicit-ws" {
+		t.Errorf("expected 'explicit-ws', got %q", got)
+	}
+	if stderr.Len() != 0 {
+		t.Errorf("expected no notice when workspace provided, got %q", stderr.String())
+	}
+}
 
 func TestResolveConnectorID_ByID(t *testing.T) {
 	params := map[string]any{"id": "conn-123"}
@@ -36,25 +109,123 @@ func TestResolveConnectorID_MissingNameAndID(t *testing.T) {
 	}
 }
 
-func TestResolveConnectorID_MissingWorkspaceName(t *testing.T) {
+func TestResolveConnectorID_DefaultsWorkspaceWhenMissing(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("workspace_name"); got != "default" {
+			t.Errorf("expected workspace_name=default, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": "conn-xyz", "name": "my-connector"}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
 	params := map[string]any{"name": "my-connector"}
-	_, err := resolveConnectorID(context.Background(), nil, params)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	apiErr, ok := err.(*client.APIError)
-	if !ok {
-		t.Fatalf("expected *client.APIError, got %T", err)
+	if result["id"] != "conn-xyz" {
+		t.Errorf("expected id=conn-xyz, got %v", result["id"])
 	}
-	if apiErr.StatusCode != 400 {
-		t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+	if result["workspace"] != "default" {
+		t.Errorf("expected workspace='default' on params after fallback, got %v", result["workspace"])
+	}
+	if !strings.Contains(stderr.String(), "falling back") {
+		t.Errorf("expected fallback notice on stderr, got %q", stderr.String())
+	}
+}
+
+func TestResolveConnectorID_MatchesTemplateSlug(t *testing.T) {
+	// User typed the template slug ("twilio") but the connector instance's
+	// stored display name is "Twilio Default" — match should still succeed
+	// via summarized_source_template.connector_name.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{
+			"id": "conn-1",
+			"name": "Twilio Default",
+			"summarized_source_template": {"name": "Twilio", "connector_name": "twilio"}
+		}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	params := map[string]any{"name": "twilio", "workspace": "default"}
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "conn-1" {
+		t.Errorf("expected id=conn-1, got %v", result["id"])
+	}
+}
+
+func TestResolveConnectorID_MatchesTemplateDisplayName(t *testing.T) {
+	// User typed the template display name ("Twilio") — match via
+	// summarized_source_template.name.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{
+			"id": "conn-2",
+			"name": "Some Custom Label",
+			"summarized_source_template": {"name": "Twilio", "connector_name": "twilio"}
+		}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	params := map[string]any{"name": "Twilio", "workspace": "default"}
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "conn-2" {
+		t.Errorf("expected id=conn-2, got %v", result["id"])
+	}
+}
+
+func TestResolveConnectorID_NoDoubleCountWhenAllNamesMatch(t *testing.T) {
+	// One connector whose three name fields all happen to match the input
+	// must still count as a single match, not three.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{
+			"id": "conn-uniq",
+			"name": "twilio",
+			"summarized_source_template": {"name": "twilio", "connector_name": "twilio"}
+		}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	params := map[string]any{"name": "twilio", "workspace": "default"}
+	result, err := resolveConnectorID(context.Background(), c, params)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["id"] != "conn-uniq" {
+		t.Errorf("expected id=conn-uniq, got %v", result["id"])
 	}
 }
 
 func TestResolveConnectorID_FoundOne(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("customer_name") != "my-workspace" {
-			t.Errorf("expected customer_name=my-workspace, got %s", r.URL.Query().Get("customer_name"))
+		if r.URL.Query().Get("workspace_name") != "my-workspace" {
+			t.Errorf("expected workspace_name=my-workspace, got %s", r.URL.Query().Get("workspace_name"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": [{"id": "conn-abc", "name": "My Connector"}, {"id": "conn-def", "name": "Other"}]}`))
@@ -130,8 +301,8 @@ func TestConnectorsList(t *testing.T) {
 		if r.URL.Path != "/api/v1/integrations/connectors" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("customer_name") != "test-ws" {
-			t.Errorf("expected customer_name=test-ws, got %s", r.URL.Query().Get("customer_name"))
+		if r.URL.Query().Get("workspace_name") != "test-ws" {
+			t.Errorf("expected workspace_name=test-ws, got %s", r.URL.Query().Get("workspace_name"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": [{"id": "c1", "name": "Connector 1"}]}`))
@@ -159,6 +330,40 @@ func TestConnectorsList(t *testing.T) {
 	data, ok := parsed["data"].([]any)
 	if !ok || len(data) != 1 {
 		t.Errorf("expected 1 connector, got %v", parsed["data"])
+	}
+}
+
+func TestConnectorsListDefaultsWorkspace(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Query().Get("workspace_name"); got != "default" {
+			t.Errorf("expected workspace_name=default, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": []}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	if _, err := connectorsList(context.Background(), c, map[string]any{}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var notice map[string]string
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
+		t.Fatalf("expected JSON notice on stderr, got %q (err: %v)", stderr.String(), err)
+	}
+	if notice["workspace"] != "default" {
+		t.Errorf("expected workspace=default in notice, got %q", notice["workspace"])
+	}
+	if !strings.Contains(notice["message"], "falling back") {
+		t.Errorf("expected message to mention fallback, got %q", notice["message"])
 	}
 }
 
@@ -307,6 +512,46 @@ func TestConnectorsDelete(t *testing.T) {
 	}
 	if gotPath != "/api/v1/integrations/connectors/conn-1" {
 		t.Errorf("expected path /api/v1/integrations/connectors/conn-1, got %s", gotPath)
+	}
+}
+
+func TestConnectorPathEscapesID(t *testing.T) {
+	got := connectorPath("conn/1?x=y")
+	want := "/api/v1/integrations/connectors/conn%2F1%3Fx=y"
+	if got != want {
+		t.Errorf("connectorPath = %q, want %q", got, want)
+	}
+}
+
+func TestConnectorsDescribeReturnsSchemaError(t *testing.T) {
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/integrations/connectors/conn-1":
+			_, _ = w.Write([]byte(`{"id": "conn-1", "name": "Test Connector"}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/integrations/connectors/conn-1/execute":
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"detail": "describe failed"}`))
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	_, err := connectorsDescribe(context.Background(), c, map[string]any{"id": "conn-1"})
+	if err == nil {
+		t.Fatal("expected describe schema error")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", apiErr.StatusCode)
 	}
 }
 

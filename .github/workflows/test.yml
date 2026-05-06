@@ -21,6 +21,14 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Verify generated schema is up to date
+        run: |
+          go generate ./...
+          if ! git diff --exit-code internal/spec/extracted_gen.go; then
+            echo "::error::internal/spec/extracted_gen.go is stale. Run 'go generate ./...' and commit the result."
+            exit 1
+          fi
+
       - name: Run tests
         run: go test ./... -v -race -coverprofile=coverage.out
 

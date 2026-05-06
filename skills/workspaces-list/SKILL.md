@@ -6,7 +6,10 @@ command: airbyte workspaces list
 
 # workspaces list
 
-List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `enrollment status`).
+List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `airbyte enroll`).
+
+> [!IMPORTANT]
+> Always pass parameters as `--json '{...}'` (use `--json '{}'` for an unfiltered list). Agents should not use per-parameter flags.
 
 > [!IMPORTANT]
 > If only one workspace exists, use it directly without prompting the user. Most accounts have a single workspace.
@@ -16,19 +19,39 @@ List workspaces in the organization. Workspace names are the identifier passed t
 
 ## Usage
 
-```
-airbyte workspaces list --format table
+```bash
+airbyte workspaces list --json '{}'
 airbyte workspaces list --json '{"name_contains": "production"}'
 airbyte workspaces list --json '{"status": "active"}'
 ```
 
-Run `airbyte workspaces list --describe` to see the full parameter schema.
+Run `airbyte schema workspaces list` to see the full parameter schema.
+
+## Filtering output
+
+> [!IMPORTANT]
+> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
+
+Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
+
+```bash
+airbyte workspaces list --fields name,status --json '{}'              # short form
+airbyte workspaces list --fields data.name,data.status --json '{}'    # long form
+```
+
+If you mix top-level and row-level paths, use the long form for row-level fields:
+
+```bash
+airbyte workspaces list --fields data.name,next --json '{}'
+```
 
 ## Discovery flow
 
-1. `airbyte workspaces list --format table` — see all workspaces.
+1. `airbyte workspaces list --json '{}'` — see all workspaces.
 2. Note the exact `name` value.
-3. Pass that name into subsequent commands: `--json '{"workspace": "<name>"}'`.
+3. Either:
+   - Pass that name into each command: `--json '{"workspace": "<name>"}'`, or
+   - Persist it as the default once: `airbyte workspaces use --json '{"name": "<name>"}'`. Subsequent commands will fall back to this when `workspace` is omitted.
 
 ## Do NOT
 

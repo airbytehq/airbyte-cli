@@ -1,4 +1,4 @@
-# airbyte
+# airbyte-cli
 
 A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents.
 
@@ -31,6 +31,9 @@ main.go
 | `cmd/` | Root Cobra command, persistent flags, version |
 | `internal/registry/` | `Resource` interface, dynamic command builder |
 | `internal/resources/` | Resource implementations |
+| `internal/spec/` | Generated OpenAPI request/response schemas |
+| `cmd/extract-schemas/` | Build-time generator: extracts the routes the CLI uses from `api/*.json` |
+| `api/` | Checked-in OpenAPI specs |
 | `skills/` | Per-command agent skill documents (`<command>/SKILL.md`) |
 | `internal/client/` | HTTP client (3x exponential-backoff retry on 429/5xx, 30s timeout) |
 | `internal/auth/` | Credential resolution, OAuth token caching |
@@ -57,15 +60,15 @@ go build -o airbyte .
 
 ## Configure
 
-Credentials can be supplied via environment variables or a credentials file at `~/.airbyte/credentials` (JSON, `0600` permissions).
+Settings can be supplied via environment variables or a settings file at `~/.airbyte/settings.json` (JSON, `0600` permissions). Three pieces of information are always required: client ID, client secret, and organization ID.
 
 ### Resolution order
 
-1. **Environment variables** — used if both `AIRBYTE_CLIENT_ID` and `AIRBYTE_CLIENT_SECRET` are set. If either is missing, the CLI falls through to the file.
-2. **Credentials file** at `~/.airbyte/credentials`.
+1. **Environment variables** — used only if **all three** of `AIRBYTE_CLIENT_ID`, `AIRBYTE_CLIENT_SECRET`, and `AIRBYTE_ORGANIZATION_ID` are set. If any is missing, the CLI falls through to the file.
+2. **Settings file** at `~/.airbyte/settings.json`. All three fields must be populated.
 3. If neither is configured, the CLI exits with an authentication error.
 
-Env vars take precedence over the file when both are present, so they're useful for one-off overrides (e.g. `AIRBYTE_CLIENT_ID=... airbyte ...`).
+Env vars take precedence over the file when all three are present, so they're useful for one-off overrides (e.g. `AIRBYTE_ORGANIZATION_ID=... airbyte ...`).
 
 ### Environment variables
 
@@ -73,20 +76,32 @@ Env vars take precedence over the file when both are present, so they're useful 
 | --- | --- | --- |
 | `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
 | `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
-| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (optional) |
+| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
+| `AIRBYTE_WORKSPACE` | Default workspace name (used when commands don't pass `workspace`) | `default` |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
-| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://cloud.airbyte.com` |
-| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `300` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `180` |
 
-### Credentials file
+### Settings file
+
+`~/.airbyte/settings.json`:
 
 ```json
 {
-  "client_id": "your-client-id",
-  "client_secret": "your-client-secret",
-  "organization_id": "your-org-id"
+  "settings": {
+    "credentials": {
+      "client_id": "your-client-id",
+      "client_secret": "your-client-secret"
+    },
+    "organization_id": "your-org-id",
+    "workspace": "default"
+  }
 }
 ```
+
+`workspace` is optional — when absent (or empty), commands that take a `workspace` parameter and don't receive one fall back to the literal `"default"`. Set it once here and you'll never need `--json '{"workspace": "..."}'` for your usual workspace.
+
+Run `airbyte configure` to be prompted for these values and have the file written for you with the right permissions.
 
 ## Usage
 
@@ -94,49 +109,105 @@ Env vars take precedence over the file when both are present, so they're useful 
 airbyte <resource> <operation> [flags]
 ```
 
-All parameters are passed as JSON via `--json`, or as a resource ID via `--id`. Output is JSON by default; `--format table` produces a human-readable table.
+Parameters can be supplied two ways: as a single JSON document via `--json`, or as individual flags (`--workspace foo --name bar`). The two modes are **mutually exclusive** — passing both is an error. Output is JSON by default; `--format table` produces a human-readable table.
 
-### Global flags
+### Two ways to pass parameters
+
+**1. Individual flags (recommended for humans)** — scalar and array parameters in the operation's schema are exposed as `--<param>` flags, with snake_case keys converted to kebab-case (e.g. `select_fields` → `--select-fields`):
+
+```bash
+airbyte connectors describe --workspace default --name hubspot
+airbyte connectors execute --workspace default --name hubspot \
+  --entity contacts --action read \
+  --select-fields id,email,name
+```
+
+Run `airbyte <resource> <operation> --help` to see the available flags for any command.
+
+**2. JSON (recommended for agents and complex payloads)** — pass the whole parameter set as a JSON object:
+
+```bash
+airbyte connectors execute --json '{
+  "workspace": "default",
+  "name": "hubspot",
+  "entity": "contacts",
+  "action": "read",
+  "select_fields": ["id", "email", "name"]
+}'
+```
+
+Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the only way to pass nested objects (e.g. the `params` field on `connectors execute`).
+
+### Common flags
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `--json` | Inline JSON parameters (or `@filename` to load from a file) | -- |
-| `--id` | Convenience flag for resource ID | -- |
+| `--json` | Operation flag for inline JSON parameters (or `@filename` to load from a file). Cannot be combined with per-parameter flags. | -- |
 | `--format` | Output format: `json` or `table` | `json` |
 | `--describe` | Print the operation's parameter schema and exit | `false` |
 | `--output, -o` | Write output to a file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
+| `--fields` | Filter the response to only the listed fields. Comma-separated, dotted paths (e.g. `data.id,data.name`). Applied client-side, after the API responds. Errors are not filtered. | -- |
+
+### Filtering output with `--fields`
+
+`--fields` shapes the response payload after it returns from the API. Paths use dotted notation; when a path crosses an array, the remaining segments are applied to every element ("array broadcast"):
+
+```bash
+# Both of these work — list responses are wrapped in {"data": [...]} and the
+# CLI auto-broadcasts when no path matches a top-level key.
+airbyte organizations list --fields id,organization_name
+airbyte organizations list --fields data.id,data.organization_name
+
+# Mixed paths require explicit prefixes — the auto-broadcast only fires
+# when *no* path matches a top-level key:
+airbyte connectors list --fields data.id,data.name,next
+```
+
+**Path resolution rules:**
+
+1. **Strict match first.** Paths are matched against top-level keys of the response.
+2. **Smart wrapper fallback.** When *no* paths match top-level keys AND the response has *exactly one* top-level array (e.g. `{"data": [...]}`), each path is implicitly prefixed with that wrapper's key and re-applied. Lets you write `--fields id,name` instead of `--fields data.id,data.name` for list-style responses.
+3. **Mixed cases stay strict.** If even one path matches top-level, no rewrite happens — pass explicit dotted paths if you also want row-level fields.
+4. **Missing paths are dropped silently.** Errors are never filtered.
+
+This is **client-side**: the full payload still travels from the API to the CLI. To reduce upstream work, `connectors execute` separately accepts `select_fields` / `exclude_fields` which are sent to the source connector. The two are complementary — combine them when you want both bandwidth savings and a clean output shape.
 
 ### Discovering commands
 
 ```bash
 airbyte --help                              # list resources
 airbyte connectors --help                   # list operations
-airbyte connectors execute --describe       # show parameter schema
+airbyte connectors execute --describe       # CLI params + OpenAPI request/response schema
+airbyte schema connectors execute           # equivalent top-level form
 ```
+
+`--describe` and `airbyte schema <resource> <operation>` return the same payload: CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
 
 ### Command surface
 
-| Resource | Operation | Description |
-| --- | --- | --- |
-| `enrollment` | `status` | Check account enrollment & provisioning |
-| `organizations` | `list` | List organizations |
-| `workspaces` | `list` | List/filter workspaces |
-| `connectors` | `list` | List connectors in a workspace |
-| `connectors` | `list-available` | List connector templates |
-| `connectors` | `describe` | Show a connector's entities and actions |
-| `connectors` | `execute` | Run an action on a connector |
-| `connectors` | `create` | Interactive browser-based credential flow |
-| `connectors` | `delete` | Delete a connector |
+| Command | Description |
+| --- | --- |
+| `configure` | Save credentials + organization id to `~/.airbyte/settings.json` |
+| `enroll` | Check (and trigger) account enrollment & provisioning |
+| `schema <resource> <op>` | Print the merged CLI + OpenAPI schema for an operation |
+| `organizations list` | List organizations |
+| `workspaces list` | List/filter workspaces |
+| `connectors list` | List connectors in a workspace |
+| `connectors list-available` | List connector templates |
+| `connectors describe` | Show a connector's entities and actions |
+| `connectors execute` | Run an action on a connector |
+| `connectors create` | Interactive browser-based credential flow |
+| `connectors delete` | Delete a connector |
 
 ### Examples
 
 ```bash
-# Verify enrollment
-airbyte enrollment status
+# Verify (and if necessary trigger) enrollment
+airbyte enroll
 
 # Find a workspace
-airbyte workspaces list --format table
+airbyte workspaces list --json '{}'
 
 # Discover what a connector can do
 airbyte connectors describe --json '{"workspace": "default", "name": "hubspot"}'
@@ -153,7 +224,7 @@ airbyte connectors execute --json '{
 # Create a new connector (opens a browser for secure credential entry)
 airbyte connectors create --json '{
   "workspace": "default",
-  "template_name": "source-hubspot"
+  "name": "hubspot"
 }'
 
 # Load a complex payload from a file
