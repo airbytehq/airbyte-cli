@@ -718,7 +718,7 @@ func TestParamFlagsKebabCase(t *testing.T) {
 	}
 }
 
-func TestObjectParamHasNoFlag(t *testing.T) {
+func TestObjectParamRegistersAsJSONStringFlag(t *testing.T) {
 	t.Cleanup(func() { Reset() })
 
 	var captured map[string]any
@@ -728,8 +728,98 @@ func TestObjectParamHasNoFlag(t *testing.T) {
 	Build(root, stubClient(), &stubFlags{format: "json"})
 
 	cmd, _, _ := root.Find([]string{"things", "do"})
-	if cmd.Flags().Lookup("params") != nil {
-		t.Error("did not expect a flag for object-typed param 'params' — must use --json")
+	flag := cmd.Flags().Lookup("params")
+	if flag == nil {
+		t.Fatal("expected --params flag for object-typed param")
+	}
+	if flag.Value.Type() != "string" {
+		t.Errorf("expected --params to be a string flag (JSON input), got %s", flag.Value.Type())
+	}
+	if !strings.Contains(flag.Usage, "JSON object") {
+		t.Errorf("expected --params usage to mention 'JSON object', got %q", flag.Usage)
+	}
+}
+
+func TestObjectParamUnmarshalsJSON(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--workspace", "ws",
+		"--params", `{"limit": 50, "filters": ["a", "b"]}`,
+	})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := captured["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected params to be a map, got %T (%v)", captured["params"], captured["params"])
+	}
+	if got["limit"] != float64(50) { // JSON numbers decode as float64
+		t.Errorf("expected limit=50, got %v", got["limit"])
+	}
+	filters, ok := got["filters"].([]any)
+	if !ok || len(filters) != 2 || filters[0] != "a" {
+		t.Errorf("expected filters=[a,b], got %v", got["filters"])
+	}
+}
+
+func TestObjectParamRejectsInvalidJSON(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--workspace", "ws",
+		"--params", `not-json`,
+	})
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not be called when --params JSON is invalid")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	var errPayload map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &errPayload); err != nil {
+		t.Fatalf("parsing stderr: %v", err)
+	}
+	if errPayload["type"] != "validation_error" {
+		t.Errorf("expected type=validation_error, got %v", errPayload["type"])
+	}
+	msg, _ := errPayload["message"].(string)
+	if !strings.Contains(msg, "--params") {
+		t.Errorf("expected message to mention --params, got %q", msg)
 	}
 }
 
