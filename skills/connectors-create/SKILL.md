@@ -9,32 +9,36 @@ command: airbyte connectors create
 Install a new connector from a template. Opens the user's browser for secure credential entry, polls until credentials are submitted, and creates the connector.
 
 > [!IMPORTANT]
+> Always pass parameters as `--json '{...}'`. Agents should not use per-parameter flags.
+
+> [!IMPORTANT]
 > **Never accept credentials directly.** This command exists so you do NOT have to. Do not ask the user for API keys, tokens, passwords, or secrets. If a user offers credentials, decline and start this flow instead.
 
 > [!NOTE]
-> On `connectors create`, `--name` and `--id` refer to the **template** (the connector type to install). On `connectors describe` / `execute` / `delete`, those same flags refer to an **existing connector instance**. Same name, different meaning depending on the verb.
+> On `connectors create`, `name` and `id` refer to the **template** (the connector type to install). On `connectors describe` / `execute` / `delete`, those same fields refer to an **existing connector instance**. Same name, different meaning depending on the verb.
 
 ## Usage
 
-```
-airbyte connectors create --workspace my-workspace --name salesforce
-airbyte connectors create --name salesforce              # workspace defaults to "default"
-airbyte connectors create --id <template-uuid>           # bypass name lookup
-
-# JSON form (mutually exclusive with per-flag form)
+```bash
 airbyte connectors create --json '{
   "workspace": "my-workspace",
   "name": "salesforce"
 }'
+
+# workspace defaults to "default" when omitted
+airbyte connectors create --json '{"name": "salesforce"}'
+
+# Bypass name lookup with a template UUID
+airbyte connectors create --json '{"id": "<template-uuid>"}'
 ```
 
 Either `name` (template name, looked up via `connectors list-available`) or `id` (template UUID) is required. `workspace` is optional and defaults to `default` when omitted; a JSON notice is printed on stderr when the fallback engages.
 
 ## Workflow
 
-```
+```bash
 # 1. Find a template
-airbyte connectors list-available --format table
+airbyte connectors list-available --json '{}'
 
 # 2. Start the flow
 airbyte connectors create --json '{"workspace": "my-workspace", "name": "hubspot"}'
@@ -46,9 +50,9 @@ airbyte connectors create --json '{"workspace": "my-workspace", "name": "hubspot
 
 ## Timeout
 
-The credential flow has a default timeout of **5 minutes**. To increase it:
+The credential flow has a default timeout of **3 minutes**. To increase it:
 
-```
+```bash
 export AIRBYTE_CREDENTIAL_TIMEOUT=900   # 15 minutes
 ```
 

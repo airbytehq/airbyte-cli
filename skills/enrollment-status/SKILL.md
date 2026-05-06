@@ -16,11 +16,11 @@ Check whether the account is enrolled and what its provisioning state is. **Alwa
 
 ## Usage
 
-```
-airbyte enrollment status
+```bash
+airbyte enrollment status --json '{}'
 ```
 
-Returns a JSON document with `is_enrolled` (bool) and `provisioning_state` (one of `null`, `IN_PROGRESS`, `COMPLETED`, `FAILED`).
+The operation takes no parameters; pass `--json '{}'` for consistency with how every other command is called from agents. Returns a JSON document with `is_enrolled` (bool) and `provisioning_state` (one of `null`, `IN_PROGRESS`, `COMPLETED`, `FAILED`).
 
 ## Provisioning state machine
 
