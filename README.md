@@ -44,6 +44,18 @@ The HTTP client retries 429/502/503/504 with backoff and surfaces non-retryable 
 
 ## Install
 
+### Homebrew (macOS, Linux)
+
+```bash
+brew install airbytehq/tap/airbyte
+```
+
+### Manual binary download
+
+Grab the archive for your platform from the [latest release](https://github.com/airbytehq/airbyte-cli/releases/latest), extract it, and put `airbyte` somewhere on your `$PATH`. Builds are published for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted).
+
+### Build from source
+
 ```bash
 git clone https://github.com/airbytehq/airbyte-cli.git
 cd airbyte-cli
@@ -52,7 +64,7 @@ make build         # builds ./airbyte
 make install       # installs to $GOBIN
 ```
 
-Build directly without the Makefile:
+Or directly without the Makefile:
 
 ```bash
 go build -o airbyte .
@@ -266,3 +278,70 @@ go vet ./...
 ```
 
 To add a new resource: implement the `Resource` interface in `internal/resources/<name>.go`, register it in `register.go`, and add tests using the existing `newTestTokenServer()` / `newTestClient()` helpers. See `AGENTS.md` for the full guide.
+
+## Releases
+
+Releases are cut by pushing a `v*` tag. The `release` workflow builds binaries for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted) via [goreleaser](https://goreleaser.com), uploads them as a draft GitHub release, and commits an updated `Formula/airbyte.rb` to [airbytehq/homebrew-tap](https://github.com/airbytehq/homebrew-tap).
+
+### Versioning
+
+Tags follow [semver](https://semver.org). While the API is unstable, stay on `v0.x.y`:
+
+- **`v0.x.0`** — new features or behavior changes (added a command, changed default behavior)
+- **`v0.x.y`** — bug fixes only
+- **`v1.0.0`** — first stable release; downgrade contract begins
+
+Pre-releases use a suffix (`v0.2.0-rc1`, `v0.2.0-beta`); goreleaser publishes the GitHub release but **skips** the Homebrew formula update for these.
+
+### Cutting a release
+
+1. **Make sure `main` is green.** All tests pass, `go generate ./...` produces no diff (CI enforces this).
+2. **Tag from `main`:**
+
+   ```bash
+   git checkout main
+   git pull
+   git tag v0.1.0
+   git push origin v0.1.0
+   ```
+
+3. **Watch the release workflow.** It runs in two halves:
+   - Builds + uploads a **draft** GitHub release (binaries, archives, `checksums.txt`).
+   - Commits `Formula/airbyte.rb` to `airbytehq/homebrew-tap@main`.
+4. **Review the draft release.** Open it in the GitHub UI, check the auto-generated changelog, and either edit the notes or accept them.
+5. **Click Publish.** This is intentional manual gating — easy to catch a misconfigured formula or stale changelog before users see it.
+6. **Smoke-test the install** on a fresh machine:
+
+   ```bash
+   brew install airbytehq/tap/airbyte
+   airbyte version
+   ```
+
+### Dry-run before tagging
+
+Validate the release pipeline locally without pushing anything:
+
+```bash
+goreleaser check                    # validates .goreleaser.yaml
+goreleaser release --snapshot --clean
+# inspect dist/ — binaries, archives, and dist/homebrew/Formula/airbyte.rb
+```
+
+The snapshot run produces real artifacts in `dist/` so you can confirm the formula renders correctly and the version-stamped ldflags resolve as expected. Nothing is uploaded.
+
+### If a release goes wrong
+
+- **Bad binaries, formula not yet committed.** Delete the draft release in the GitHub UI, delete the tag locally and remotely (`git tag -d v0.1.0 && git push origin :refs/tags/v0.1.0`), fix, retag.
+- **Formula already committed but binaries broken.** Delete the formula commit on `homebrew-tap` (open a one-line revert PR), then retag a new patch version. Don't re-use the same tag.
+- **Need to yank a published release.** Delete the formula commit on `homebrew-tap`. Existing `brew install`s won't rollback automatically; users with the broken version will keep it until they `brew upgrade airbyte`. Consider a `0.x.y+1` patch release rather than a yank when possible — fewer surprises for users.
+
+### Required secrets
+
+The workflow expects two secrets in this repo (organization-level is fine):
+
+| Secret | Purpose |
+| --- | --- |
+| `OCTAVIA_BOT_APP_ID` | GitHub App ID for the bot that pushes the formula commit |
+| `OCTAVIA_BOT_PRIVATE_KEY` | Private key for the same GitHub App |
+
+The App's installation must include both `airbytehq/airbyte-cli` and `airbytehq/homebrew-tap`, with `contents: write` permission on both.
