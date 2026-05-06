@@ -6,7 +6,7 @@ command: airbyte connectors execute
 
 # connectors execute
 
-Run an action against an entity on a connector — the workhorse command for actually moving data. This skill embeds the same knowledge that the Sonar SDK injects into agent context for the underlying API; you can invoke `execute` correctly without first running `connectors describe` for anything except entity discovery on an unfamiliar connector.
+Run an action against an entity on a connector — the workhorse command for actually moving data. This skill embeds the SDK-level knowledge of how the underlying API behaves (filter operators, pagination, response shape, field-selection rules). For *connector-specific* details — which entities exist, which actions they support, and which params they take — call `connectors describe` first; never guess.
 
 > [!IMPORTANT]
 > **Always pass parameters as `--json '{...}'`.** The CLI also exposes per-parameter flags (`--workspace`, `--name`, etc.) for human use, but agents should always send a single JSON payload. The two modes are mutually exclusive and JSON keeps your input self-describing for review and replay.
@@ -16,6 +16,9 @@ Run an action against an entity on a connector — the workhorse command for act
 
 > [!IMPORTANT]
 > **Prefer `context_store_search` over `list`.** The default action for any read is `context_store_search` — it supports filtering, sorting, and pagination. Only use `list` when (a) you need today's data (the search index can lag hours), or (b) `context_store_search` returns no results and you suspect indexing delay.
+
+> [!IMPORTANT]
+> **`connectors describe` is the source of truth for what a specific connector supports.** Use it to discover the **entities** the connector exposes, the **actions** valid on each entity, and the **params** each action accepts (filter fields, required arguments, response shape). Do NOT guess any of these — every guess is an avoidable round-trip. The action table below is a *baseline* (most connectors support most of these), but the actually-supported set is what `describe` reports.
 
 ## Usage
 
@@ -32,9 +35,9 @@ airbyte connectors execute --json '{
 
 `name` (or `id`), `entity`, and `action` are required. `workspace` defaults to `default` when omitted. Pass complex payloads via `--json @path/to/file.json` to keep the shell command short.
 
-## Available actions
+## Available actions (baseline)
 
-Every connector exposes these actions. Entities vary per connector (run `connectors describe` to discover them on an unfamiliar source).
+Most connectors expose these actions, but the authoritative list for a given connector comes from `connectors describe` (see next section). Entities are always per-connector — never assume them.
 
 | Action | Purpose | Supports filtering? |
 |---|---|---|
@@ -44,6 +47,40 @@ Every connector exposes these actions. Entities vary per connector (run `connect
 | `api_search` | Provider-native search (e.g. Slack search syntax). Returns `{data, meta: {has_more}}`. | provider-specific |
 | `create` | Write a new entity. | n/a |
 | `update` | Modify an existing entity. | n/a |
+
+## Discovering entities, actions, and params with `connectors describe`
+
+Before guessing what to put in the `entity` / `action` / `params` fields, run `connectors describe` against the connector. Its output is the contract — it lists every entity the connector supports, every action valid on each entity, and the param schema each action accepts.
+
+```bash
+airbyte connectors describe --json '{"workspace": "default", "name": "hubspot"}'
+```
+
+What you'll find in the response:
+
+- **`entities`** — the named entity types this connector exposes (e.g. `contacts`, `deals`, `users` for HubSpot; `calls`, `messages`, `accounts` for Twilio). Use one of these as the `entity` value on `execute`.
+- **`actions` per entity** — which of `list`, `get`, `context_store_search`, `api_search`, `create`, `update` are valid for that entity (read-only entities will lack `create`/`update`; some only support `get`).
+- **`params` schema per action** — which fields are required vs optional, what filters are supported (e.g. `eq`/`fuzzy`/`like` for the searchable fields), what the request shape for `create`/`update` looks like.
+- **Field schemas** — names and types of the fields each entity returns. Use these to pick `select_fields` precisely; never `select_fields: ["everything"]`.
+
+Workflow when starting work on an unfamiliar connector:
+
+```bash
+# 1. Discover entities + actions + params
+airbyte connectors describe --json '{"workspace": "default", "name": "<connector>"}'
+
+# 2. Now compose execute, knowing the contract
+airbyte connectors execute --json '{
+  "workspace": "default",
+  "name": "<connector>",
+  "entity": "<an-entity-from-describe>",
+  "action": "<an-action-from-describe>",
+  "select_fields": ["<field-from-describe>", "..."],
+  "params": { ... per the param schema in describe ... }
+}'
+```
+
+If `execute` returns `validation_error` on `entity` or `action`, you guessed — run `describe` and try again with the real names.
 
 ## Response structure
 
@@ -191,7 +228,7 @@ airbyte connectors execute --fields data.id,data.email,meta.has_more --json '{
 
 - Do NOT call `execute` without `select_fields` or `exclude_fields`. Field selection is mandatory.
 - Do NOT use `like` when `fuzzy` would do — `like` fails on word reordering and typos.
-- Do NOT guess entity names. Run `connectors describe` for unfamiliar connectors.
+- Do NOT guess entity, action, or param names. Run `connectors describe` first — it's the source of truth for what a specific connector supports.
 - Do NOT pass credentials in the `execute` payload — credentials live on the connector and are set via `connectors create`.
 - Do NOT paginate beyond 3 pages — narrow the filter instead.
 - Do NOT pass relative dates ("today", "last week") — resolve to absolute ISO 8601 timestamps and report the range to the user.
