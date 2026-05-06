@@ -122,6 +122,131 @@ func TestWorkspacesListPagination(t *testing.T) {
 	}
 }
 
+func TestUseWorkspace_UpdatesSettingsFile(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	// Pre-populate settings.json with an existing config so 'use' has
+	// something to update.
+	if err := auth.WriteSettingsFile(&auth.Settings{
+		Credentials:    auth.Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID: "org",
+		Workspace:      "old-ws",
+	}); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// useWorkspace verifies the name exists by calling the workspaces list.
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": "ws-1", "name": "Production"}, {"id": "ws-2", "name": "staging"}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	// Type "production" (lowercase). The API returned "Production" — we
+	// should save the canonical case.
+	result, err := useWorkspace(context.Background(), c, map[string]any{"name": "production"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map result, got %T", result)
+	}
+	if resMap["workspace"] != "Production" {
+		t.Errorf("expected canonical workspace=Production, got %v", resMap["workspace"])
+	}
+
+	// Confirm it persisted to disk.
+	loaded, err := auth.ReadSettingsFile()
+	if err != nil {
+		t.Fatalf("re-reading settings: %v", err)
+	}
+	if loaded.Workspace != "Production" {
+		t.Errorf("settings.json workspace = %q, want %q", loaded.Workspace, "Production")
+	}
+	// Other fields preserved.
+	if loaded.Credentials.ClientID != "id" || loaded.OrganizationID != "org" {
+		t.Errorf("other fields lost: %+v", loaded)
+	}
+}
+
+func TestUseWorkspace_NotFound(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	if err := auth.WriteSettingsFile(&auth.Settings{
+		Credentials:    auth.Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID: "org",
+	}); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": []}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	_, err := useWorkspace(context.Background(), c, map[string]any{"name": "missing"})
+	if err == nil {
+		t.Fatal("expected not_found error, got nil")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 404 {
+		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	}
+}
+
+func TestUseWorkspace_MissingName(t *testing.T) {
+	_, err := useWorkspace(context.Background(), nil, map[string]any{})
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 400 {
+		t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+	}
+}
+
+func TestUseWorkspace_NoSettingsFile(t *testing.T) {
+	// Empty HOME → settings.json doesn't exist.
+	t.Setenv("HOME", t.TempDir())
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": "ws-1", "name": "Production"}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	_, err := useWorkspace(context.Background(), c, map[string]any{"name": "Production"})
+	if err == nil {
+		t.Fatal("expected error when settings.json doesn't exist")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 404 {
+		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	}
+}
+
 func TestWorkspacesListWithFilters(t *testing.T) {
 	var gotQuery string
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

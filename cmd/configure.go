@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/airbytehq/airbyte-cli/internal/auth"
+	"github.com/airbytehq/airbyte-cli/internal/client"
 	outputpkg "github.com/airbytehq/airbyte-cli/internal/output"
 	"github.com/spf13/cobra"
 )
@@ -63,7 +64,58 @@ The workspace is used as the fallback for any command that takes a
 	},
 }
 
+var configureShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "Print the saved settings (with the client secret obfuscated)",
+	Long: `Read ~/.airbyte/settings.json and print its contents as JSON. The
+client_secret is obfuscated — only the trailing characters are visible —
+so the output is safe to paste into a bug report or share for debugging.
+
+This command reads the file directly, not the runtime resolved settings.
+If you have AIRBYTE_* environment variables set, they may override what's
+shown here when the CLI actually makes API calls.`,
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		settings, err := auth.ReadSettingsFile()
+		if err != nil {
+			if os.IsNotExist(err) {
+				outputpkg.WriteError(map[string]any{
+					"type":    "not_found",
+					"message": "settings file does not exist",
+					"hint":    "run 'airbyte configure' to create ~/.airbyte/settings.json",
+				})
+				os.Exit(client.ExitNotFound)
+			}
+			outputpkg.WriteError(map[string]any{"type": "error", "message": err.Error()})
+			os.Exit(client.ExitGeneral)
+		}
+
+		return outputpkg.WriteJSON(os.Stdout, map[string]string{
+			"client_id":       settings.Credentials.ClientID,
+			"client_secret":   obfuscateSecret(settings.Credentials.ClientSecret),
+			"organization_id": settings.OrganizationID,
+			"workspace":       settings.Workspace,
+		})
+	},
+}
+
+// obfuscateSecret replaces all but the last 4 characters of s with asterisks.
+// Short secrets (<= 4 chars) are fully obfuscated. Empty input passes through.
+// Pattern matches the AWS / GCP convention so users can confirm they're
+// looking at the right credential without leaking it.
+func obfuscateSecret(s string) string {
+	if s == "" {
+		return ""
+	}
+	if len(s) <= 4 {
+		return strings.Repeat("*", len(s))
+	}
+	return strings.Repeat("*", len(s)-4) + s[len(s)-4:]
+}
+
 func init() {
+	configureCmd.AddCommand(configureShowCmd)
 	rootCmd.AddCommand(configureCmd)
 }
 

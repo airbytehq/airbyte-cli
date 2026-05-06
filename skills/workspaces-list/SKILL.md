@@ -49,7 +49,9 @@ airbyte workspaces list --fields data.name,next --json '{}'
 
 1. `airbyte workspaces list --json '{}'` — see all workspaces.
 2. Note the exact `name` value.
-3. Pass that name into subsequent commands: `--json '{"workspace": "<name>"}'`.
+3. Either:
+   - Pass that name into each command: `--json '{"workspace": "<name>"}'`, or
+   - Persist it as the default once: `airbyte workspaces use --json '{"name": "<name>"}'`. Subsequent commands will fall back to this when `workspace` is omitted.
 
 ## Do NOT
 
