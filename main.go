@@ -18,7 +18,10 @@ func main() {
 	if settings, err := auth.ResolveSettings(); err == nil {
 		creds := settings.Credentials
 		tm := auth.NewTokenManager(cfg.APIHost, settings.OrganizationID, &creds)
-		c = client.New(cfg.APIHost, settings.OrganizationID, cmd.Version, tm, client.WithDebugFunc(cmd.GetVerbose))
+		c = client.New(cfg.APIHost, settings.OrganizationID, cmd.Version, tm,
+			client.WithDebugFunc(cmd.GetVerbose),
+			client.WithDefaultWorkspace(settings.Workspace),
+		)
 	}
 
 	cmd.SetAPIClient(c)

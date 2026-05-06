@@ -33,6 +33,7 @@ type settingsFile struct {
 type settingsBody struct {
 	Credentials    credentialsBody `json:"credentials"`
 	OrganizationID string          `json:"organization_id"`
+	Workspace      string          `json:"workspace,omitempty"`
 }
 
 type credentialsBody struct {
@@ -73,6 +74,7 @@ func ReadSettingsFile() (*Settings, error) {
 			ClientSecret: sf.Settings.Credentials.ClientSecret,
 		},
 		OrganizationID: sf.Settings.OrganizationID,
+		Workspace:      sf.Settings.Workspace,
 	}, nil
 }
 
@@ -96,6 +98,7 @@ func WriteSettingsFile(s *Settings) error {
 				ClientSecret: s.Credentials.ClientSecret,
 			},
 			OrganizationID: s.OrganizationID,
+			Workspace:      s.Workspace,
 		},
 	}
 	content, err := json.MarshalIndent(sf, "", "  ")

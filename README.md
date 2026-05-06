@@ -77,6 +77,7 @@ Env vars take precedence over the file when all three are present, so they're us
 | `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
 | `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
 | `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
+| `AIRBYTE_WORKSPACE` | Default workspace name (used when commands don't pass `workspace`) | `default` |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
 | `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
 | `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `180` |
@@ -92,10 +93,13 @@ Env vars take precedence over the file when all three are present, so they're us
       "client_id": "your-client-id",
       "client_secret": "your-client-secret"
     },
-    "organization_id": "your-org-id"
+    "organization_id": "your-org-id",
+    "workspace": "default"
   }
 }
 ```
+
+`workspace` is optional — when absent (or empty), commands that take a `workspace` parameter and don't receive one fall back to the literal `"default"`. Set it once here and you'll never need `--json '{"workspace": "..."}'` for your usual workspace.
 
 Run `airbyte configure` to be prompted for these values and have the file written for you with the right permissions.
 

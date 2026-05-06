@@ -169,6 +169,7 @@ The HTTP client automatically retries transient failures:
 | `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
 | `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
 | `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
+| `AIRBYTE_WORKSPACE` | Default workspace name | `default` |
 
 All three are also stored in the settings file (`~/.airbyte/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file.
 
@@ -189,10 +190,13 @@ Settings file at `~/.airbyte/settings.json` (JSON format, 0600 permissions):
       "client_id": "your-client-id",
       "client_secret": "your-client-secret"
     },
-    "organization_id": "your-org-id"
+    "organization_id": "your-org-id",
+    "workspace": "default"
   }
 }
 ```
+
+`workspace` is optional. When absent or empty, commands that take a `workspace` parameter without receiving one fall back to the literal `"default"`. Resources read the configured value via `client.Client.DefaultWorkspace()`, which `main.go` populates from `Settings.Workspace`.
 
 ## Adding New Resources
 

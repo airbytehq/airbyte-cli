@@ -125,7 +125,7 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 		return params, nil
 	}
 
-	workspaceName := applyDefaultWorkspace(params)
+	workspaceName := applyDefaultWorkspace(c, params)
 
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
 		"workspace_name": workspaceName,
@@ -179,7 +179,10 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 	}
 }
 
-const defaultWorkspaceName = "default"
+// fallbackWorkspaceName is the last-resort default applied when neither
+// the caller nor the user's settings.json supply a workspace. It matches
+// the API's own default-workspace convention for new accounts.
+const fallbackWorkspaceName = "default"
 
 // statusWriter is the stream where the connectors resource prints user-facing
 // status messages (e.g. the workspace fallback notice). Tests override it to
@@ -187,24 +190,36 @@ const defaultWorkspaceName = "default"
 var statusWriter io.Writer = os.Stderr
 
 // applyDefaultWorkspace resolves params["workspace"], falling back to the
-// default workspace and emitting a JSON notice when not provided. Mutates
-// params so downstream code can read the resolved name back from it.
-func applyDefaultWorkspace(params map[string]any) string {
+// user's configured default (from ~/.airbyte/settings.json, exposed on the
+// client) and ultimately to the literal "default" if neither is set. When
+// the fallback engages, a JSON notice is printed to stderr so users can see
+// which workspace was actually used.
+func applyDefaultWorkspace(c *client.Client, params map[string]any) string {
 	name, _ := params["workspace"].(string)
 	if name != "" {
 		return name
 	}
+	resolved := configuredDefaultWorkspace(c)
 	notice, _ := json.Marshal(map[string]string{
-		"message":   fmt.Sprintf("no workspace provided; falling back to %q", defaultWorkspaceName),
-		"workspace": defaultWorkspaceName,
+		"message":   fmt.Sprintf("no workspace provided; falling back to %q", resolved),
+		"workspace": resolved,
 	})
 	fmt.Fprintln(statusWriter, string(notice))
-	params["workspace"] = defaultWorkspaceName
-	return defaultWorkspaceName
+	params["workspace"] = resolved
+	return resolved
+}
+
+func configuredDefaultWorkspace(c *client.Client) string {
+	if c != nil {
+		if name := c.DefaultWorkspace(); name != "" {
+			return name
+		}
+	}
+	return fallbackWorkspaceName
 }
 
 func connectorsList(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-	workspaceName := applyDefaultWorkspace(params)
+	workspaceName := applyDefaultWorkspace(c, params)
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
 		"workspace_name": workspaceName,
 	})

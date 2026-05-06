@@ -13,12 +13,20 @@ type Credentials struct {
 }
 
 // Settings is the full set of user-supplied configuration that determines
-// who the CLI talks to: the OAuth credentials plus the organization to
-// scope every request to. organization_id is required — without it the
-// API rejects most calls with a workspace_id-style validation error.
+// who the CLI talks to: the OAuth credentials, the organization to scope
+// every request to, and the user's preferred default workspace.
+//
+// organization_id is required — without it the API rejects most calls
+// with a workspace_id-style validation error.
+//
+// Workspace is optional and represents the user's "I usually mean this
+// one" workspace. When empty, the literal string "default" is used as a
+// last-resort fallback (matching the behavior of the API's default
+// workspace for new accounts).
 type Settings struct {
 	Credentials    Credentials
 	OrganizationID string
+	Workspace      string
 }
 
 // ResolveSettings returns the Settings to use for the current invocation.
@@ -51,6 +59,7 @@ func fromEnv() (*Settings, bool) {
 	return &Settings{
 		Credentials:    Credentials{ClientID: id, ClientSecret: secret},
 		OrganizationID: orgID,
+		Workspace:      os.Getenv("AIRBYTE_WORKSPACE"),
 	}, true
 }
 
