@@ -20,6 +20,7 @@ func (e *enrollmentResource) Operations() []registry.Operation {
 				Description: "Check account enrollment status",
 				Params:      map[string]registry.ParamSchema{},
 			},
+			SpecRef: registry.SpecRef{Path: "/api/v1/internal/account/enrollment-status", Method: "GET"},
 			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 				raw, err := c.Get(ctx, "/api/v1/internal/account/enrollment-status", nil)
 				if err != nil {

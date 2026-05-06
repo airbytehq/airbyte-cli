@@ -79,7 +79,7 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 		Short: op.Description,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flags.GetDescribe() {
-				if err := output.WriteJSON(os.Stdout, op.Schema); err != nil {
+				if err := output.WriteJSON(os.Stdout, BuildSchemaOutput(*op)); err != nil {
 					writeStderrError("output_error", err.Error())
 					osExit(client.ExitGeneral)
 				}

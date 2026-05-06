@@ -33,6 +33,7 @@ func connectorsCreateOperation() registry.Operation {
 				"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when omitted)"},
 			},
 		},
+		SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors", Method: "POST"},
 		Hooks: registry.OperationHooks{
 			Interactive: connectorsCreateInteractive,
 		},

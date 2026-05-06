@@ -31,6 +31,9 @@ main.go
 | `cmd/` | Root Cobra command, persistent flags, version |
 | `internal/registry/` | `Resource` interface, dynamic command builder |
 | `internal/resources/` | Resource implementations |
+| `internal/spec/` | Generated OpenAPI request/response schemas |
+| `cmd/extract-schemas/` | Build-time generator: extracts the routes the CLI uses from `api/*.json` |
+| `api/` | Checked-in OpenAPI specs |
 | `skills/` | Per-command agent skill documents (`<command>/SKILL.md`) |
 | `internal/client/` | HTTP client (3x exponential-backoff retry on 429/5xx, 30s timeout) |
 | `internal/auth/` | Credential resolution, OAuth token caching |
@@ -163,8 +166,11 @@ This is **client-side**: the full payload still travels from the API to the CLI.
 ```bash
 airbyte --help                              # list resources
 airbyte connectors --help                   # list operations
-airbyte connectors execute --describe       # show parameter schema
+airbyte connectors execute --describe       # CLI params + OpenAPI request/response schema
+airbyte schema connectors execute           # equivalent top-level form
 ```
+
+`--describe` and `airbyte schema <resource> <operation>` return the same payload: CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
 
 ### Command surface
 
