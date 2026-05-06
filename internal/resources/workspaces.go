@@ -52,10 +52,7 @@ func listWorkspaces(ctx context.Context, c *client.Client, params map[string]any
 	}
 
 	for {
-		var page struct {
-			Data []json.RawMessage `json:"data"`
-			Next *string           `json:"next"`
-		}
+		var page workspaceListPage
 		if err := json.Unmarshal(raw, &page); err != nil {
 			return raw, nil
 		}

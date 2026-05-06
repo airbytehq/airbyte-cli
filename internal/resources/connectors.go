@@ -128,18 +128,13 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 	workspaceName := applyDefaultWorkspace(params)
 
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
-		"customer_name": workspaceName,
+		"workspace_name": workspaceName,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	var resp struct {
-		Data []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"data"`
-	}
+	var resp connectorLookupResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("parsing connectors list: %w", err)
 	}
@@ -195,7 +190,7 @@ func applyDefaultWorkspace(params map[string]any) string {
 func connectorsList(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	workspaceName := applyDefaultWorkspace(params)
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
-		"customer_name": workspaceName,
+		"workspace_name": workspaceName,
 	})
 	if err != nil {
 		return nil, err

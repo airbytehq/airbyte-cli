@@ -80,8 +80,8 @@ func TestResolveConnectorID_MissingNameAndID(t *testing.T) {
 
 func TestResolveConnectorID_DefaultsWorkspaceWhenMissing(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("customer_name"); got != "default" {
-			t.Errorf("expected customer_name=default, got %q", got)
+		if got := r.URL.Query().Get("workspace_name"); got != "default" {
+			t.Errorf("expected workspace_name=default, got %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": [{"id": "conn-xyz", "name": "my-connector"}]}`))
@@ -114,8 +114,8 @@ func TestResolveConnectorID_DefaultsWorkspaceWhenMissing(t *testing.T) {
 
 func TestResolveConnectorID_FoundOne(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("customer_name") != "my-workspace" {
-			t.Errorf("expected customer_name=my-workspace, got %s", r.URL.Query().Get("customer_name"))
+		if r.URL.Query().Get("workspace_name") != "my-workspace" {
+			t.Errorf("expected workspace_name=my-workspace, got %s", r.URL.Query().Get("workspace_name"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": [{"id": "conn-abc", "name": "My Connector"}, {"id": "conn-def", "name": "Other"}]}`))
@@ -191,8 +191,8 @@ func TestConnectorsList(t *testing.T) {
 		if r.URL.Path != "/api/v1/integrations/connectors" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		if r.URL.Query().Get("customer_name") != "test-ws" {
-			t.Errorf("expected customer_name=test-ws, got %s", r.URL.Query().Get("customer_name"))
+		if r.URL.Query().Get("workspace_name") != "test-ws" {
+			t.Errorf("expected workspace_name=test-ws, got %s", r.URL.Query().Get("workspace_name"))
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": [{"id": "c1", "name": "Connector 1"}]}`))
@@ -225,8 +225,8 @@ func TestConnectorsList(t *testing.T) {
 
 func TestConnectorsListDefaultsWorkspace(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("customer_name"); got != "default" {
-			t.Errorf("expected customer_name=default, got %q", got)
+		if got := r.URL.Query().Get("workspace_name"); got != "default" {
+			t.Errorf("expected workspace_name=default, got %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"data": []}`))
