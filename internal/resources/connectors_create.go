@@ -29,7 +29,7 @@ const (
 // vars (not consts) so tests can override them for fast iteration.
 var (
 	initialCredentialPollDelay = 30 * time.Second
-	credentialPollInterval     = 5 * time.Second
+	credentialPollInterval     = 3 * time.Second
 )
 
 func connectorsCreateOperation() registry.Operation {
