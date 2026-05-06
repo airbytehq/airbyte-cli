@@ -378,6 +378,25 @@ func TestClient_RejectsExternalPaginationURL(t *testing.T) {
 	}
 }
 
+func TestClient_RejectsSchemeRelativePaginationURL(t *testing.T) {
+	creds := &auth.Credentials{ClientID: "id", ClientSecret: "secret"}
+	tm := auth.NewTokenManager("https://api.example.com", "", creds)
+	c := New("https://api.example.com", "", "test", tm)
+
+	_, err := c.GetURL(context.Background(), "//evil.example.com/api/v1/workspaces?cursor=next")
+	if err == nil {
+		t.Fatal("expected error for scheme-relative external pagination URL")
+	}
+
+	apiErr, ok := err.(*APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Type != "validation_error" {
+		t.Errorf("Type = %q, want validation_error", apiErr.Type)
+	}
+}
+
 func TestClient_DebugFuncIsEvaluatedAtRequestTime(t *testing.T) {
 	debug := false
 	c := New("https://api.example.com", "", "test", nil, WithDebugFunc(func() bool { return debug }))
