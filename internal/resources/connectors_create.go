@@ -52,7 +52,7 @@ func connectorsCreateOperation() registry.Operation {
 }
 
 func connectorsCreateInteractive(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-	workspaceName := applyDefaultWorkspace(params)
+	workspaceName := applyDefaultWorkspace(c, params)
 
 	templateID, err := resolveTemplateID(ctx, c, params)
 	if err != nil {

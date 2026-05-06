@@ -24,13 +24,14 @@ const (
 )
 
 type Client struct {
-	apiHost        string
-	organizationID string
-	userAgent      string
-	tokenManager   *auth.TokenManager
-	httpClient     *http.Client
-	debug          bool
-	debugFunc      func() bool
+	apiHost          string
+	organizationID   string
+	defaultWorkspace string
+	userAgent        string
+	tokenManager     *auth.TokenManager
+	httpClient       *http.Client
+	debug            bool
+	debugFunc        func() bool
 }
 
 type Option func(*Client)
@@ -45,6 +46,21 @@ func WithDebugFunc(debugFunc func() bool) Option {
 	return func(c *Client) {
 		c.debugFunc = debugFunc
 	}
+}
+
+// WithDefaultWorkspace sets the workspace name used as a fallback when a
+// command needs `workspace` but the caller didn't supply one. Empty string
+// is allowed (resources fall back to a hardcoded "default").
+func WithDefaultWorkspace(name string) Option {
+	return func(c *Client) {
+		c.defaultWorkspace = name
+	}
+}
+
+// DefaultWorkspace returns the configured fallback workspace name, or "" if
+// none was set.
+func (c *Client) DefaultWorkspace() string {
+	return c.defaultWorkspace
 }
 
 func New(apiHost, organizationID, version string, tm *auth.TokenManager, opts ...Option) *Client {

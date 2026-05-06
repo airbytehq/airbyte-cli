@@ -12,14 +12,16 @@ import (
 	"github.com/airbytehq/airbyte-cli/internal/client"
 )
 
-func TestApplyDefaultWorkspace_Empty(t *testing.T) {
+func TestApplyDefaultWorkspace_EmptyFallsBackToHardcoded(t *testing.T) {
+	// Nil client + no param + no configured default → "default" (the
+	// last-resort fallback).
 	var stderr bytes.Buffer
 	prev := statusWriter
 	statusWriter = &stderr
 	defer func() { statusWriter = prev }()
 
 	params := map[string]any{}
-	got := applyDefaultWorkspace(params)
+	got := applyDefaultWorkspace(nil, params)
 	if got != "default" {
 		t.Errorf("expected 'default', got %q", got)
 	}
@@ -36,14 +38,43 @@ func TestApplyDefaultWorkspace_Empty(t *testing.T) {
 	}
 }
 
-func TestApplyDefaultWorkspace_Provided(t *testing.T) {
+func TestApplyDefaultWorkspace_UsesClientConfiguredDefault(t *testing.T) {
+	// Empty params + client with a configured default → use that default.
 	var stderr bytes.Buffer
 	prev := statusWriter
 	statusWriter = &stderr
 	defer func() { statusWriter = prev }()
 
+	c := client.New("", "", "test", nil, client.WithDefaultWorkspace("my-workspace"))
+
+	params := map[string]any{}
+	got := applyDefaultWorkspace(c, params)
+	if got != "my-workspace" {
+		t.Errorf("expected 'my-workspace' (from settings), got %q", got)
+	}
+	if params["workspace"] != "my-workspace" {
+		t.Errorf("expected params['workspace']='my-workspace', got %v", params["workspace"])
+	}
+
+	var notice map[string]string
+	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
+		t.Fatalf("expected JSON notice on stderr, got %q", stderr.String())
+	}
+	if notice["workspace"] != "my-workspace" {
+		t.Errorf("notice should report the configured default; got %v", notice)
+	}
+}
+
+func TestApplyDefaultWorkspace_ExplicitParamWins(t *testing.T) {
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	c := client.New("", "", "test", nil, client.WithDefaultWorkspace("ignored"))
+
 	params := map[string]any{"workspace": "explicit-ws"}
-	got := applyDefaultWorkspace(params)
+	got := applyDefaultWorkspace(c, params)
 	if got != "explicit-ws" {
 		t.Errorf("expected 'explicit-ws', got %q", got)
 	}
