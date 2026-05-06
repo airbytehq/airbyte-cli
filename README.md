@@ -97,7 +97,7 @@ Env vars take precedence over the file when all three are present, so they're us
 }
 ```
 
-Run `airbyte auth login` to be prompted for these values and have the file written for you with the right permissions.
+Run `airbyte configure` to be prompted for these values and have the file written for you with the right permissions.
 
 ## Usage
 
@@ -182,26 +182,28 @@ airbyte schema connectors execute           # equivalent top-level form
 
 ### Command surface
 
-| Resource | Operation | Description |
-| --- | --- | --- |
-| `enrollment` | `status` | Check account enrollment & provisioning |
-| `organizations` | `list` | List organizations |
-| `workspaces` | `list` | List/filter workspaces |
-| `connectors` | `list` | List connectors in a workspace |
-| `connectors` | `list-available` | List connector templates |
-| `connectors` | `describe` | Show a connector's entities and actions |
-| `connectors` | `execute` | Run an action on a connector |
-| `connectors` | `create` | Interactive browser-based credential flow |
-| `connectors` | `delete` | Delete a connector |
+| Command | Description |
+| --- | --- |
+| `configure` | Save credentials + organization id to `~/.airbyte/settings.json` |
+| `enroll` | Check (and trigger) account enrollment & provisioning |
+| `schema <resource> <op>` | Print the merged CLI + OpenAPI schema for an operation |
+| `organizations list` | List organizations |
+| `workspaces list` | List/filter workspaces |
+| `connectors list` | List connectors in a workspace |
+| `connectors list-available` | List connector templates |
+| `connectors describe` | Show a connector's entities and actions |
+| `connectors execute` | Run an action on a connector |
+| `connectors create` | Interactive browser-based credential flow |
+| `connectors delete` | Delete a connector |
 
 ### Examples
 
 ```bash
-# Verify enrollment
-airbyte enrollment status
+# Verify (and if necessary trigger) enrollment
+airbyte enroll
 
 # Find a workspace
-airbyte workspaces list --format table
+airbyte workspaces list --json '{}'
 
 # Discover what a connector can do
 airbyte connectors describe --json '{"workspace": "default", "name": "hubspot"}'

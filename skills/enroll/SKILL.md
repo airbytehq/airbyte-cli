@@ -1,12 +1,14 @@
 ---
-name: enrollment-status
-description: Verify the account is enrolled and provisioned. Always run this first.
-command: airbyte enrollment status
+name: enroll
+description: Verify (and trigger) account enrollment.
+command: airbyte enroll
 ---
 
-# enrollment status
+# enroll
 
 Check whether the account is enrolled and what its provisioning state is. **Always the first command in any session** — every other command will fail if the account is not provisioned.
+
+The first call for a new account *also triggers* enrollment automatically — this is why the command is named `enroll` rather than `enrollment status`. Polling the same command moves the account through provisioning to completion.
 
 > [!IMPORTANT]
 > If `provisioning_state` is `IN_PROGRESS`, poll with exponential backoff until it transitions. Do NOT proceed with other commands until `is_enrolled: true`.
@@ -17,10 +19,10 @@ Check whether the account is enrolled and what its provisioning state is. **Alwa
 ## Usage
 
 ```bash
-airbyte enrollment status --json '{}'
+airbyte enroll
 ```
 
-The operation takes no parameters; pass `--json '{}'` for consistency with how every other command is called from agents. Returns a JSON document with `is_enrolled` (bool) and `provisioning_state` (one of `null`, `IN_PROGRESS`, `COMPLETED`, `FAILED`).
+The command takes no parameters. Returns a JSON document with `is_enrolled` (bool) and `provisioning_state` (one of `null`, `IN_PROGRESS`, `COMPLETED`, `FAILED`), plus organization metadata when enrollment is complete.
 
 ## Provisioning state machine
 
@@ -29,7 +31,7 @@ null → IN_PROGRESS → COMPLETED
                   → FAILED
 ```
 
-Provisioning typically completes within 10–30 seconds. The first call to `enrollment status` for a new account triggers provisioning automatically.
+Provisioning typically completes within 10–30 seconds. The first call to `enroll` for a new account triggers provisioning automatically.
 
 ## Polling strategy
 

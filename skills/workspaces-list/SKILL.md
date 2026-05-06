@@ -6,7 +6,7 @@ command: airbyte workspaces list
 
 # workspaces list
 
-List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `enrollment status`).
+List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `airbyte enroll`).
 
 > [!IMPORTANT]
 > Always pass parameters as `--json '{...}'` (use `--json '{}'` for an unfiltered list). Agents should not use per-parameter flags.

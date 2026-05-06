@@ -47,10 +47,10 @@ airbyte <resource> <operation> --describe  # Show parameter schema
 
 ```bash
 # Configure credentials interactively
-airbyte auth login
+airbyte configure
 
 # Verify enrollment
-airbyte enrollment status
+airbyte enroll
 
 # Find your workspace
 airbyte workspaces list --format table
