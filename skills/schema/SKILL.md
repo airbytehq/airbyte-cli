@@ -65,4 +65,4 @@ Use whichever fits your flow. `airbyte schema` is the discoverable top-level for
 
 - `--describe` and `airbyte schema` never make API calls — safe to run without auth, against unfamiliar accounts, etc.
 - Errors from `airbyte schema` (unknown resource or operation) are JSON on stderr with exit code 3.
-- Operations that don't map to an OpenAPI route (e.g. `auth login`, which is purely local) omit the `api` block.
+- Operations that don't map to an OpenAPI route omit the `api` block. (`airbyte configure` is also purely local but isn't a registered operation — it's a top-level command.)

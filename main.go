@@ -21,6 +21,7 @@ func main() {
 		c = client.New(cfg.APIHost, settings.OrganizationID, cmd.Version, tm, client.WithDebugFunc(cmd.GetVerbose))
 	}
 
+	cmd.SetAPIClient(c)
 	resources.RegisterAll()
 	registry.Build(cmd.GetRootCmd(), c, cmd.FlagAccessor())
 

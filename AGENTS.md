@@ -63,7 +63,7 @@ The CLI uses a **resource-registry** pattern:
 | File | Purpose |
 | --- | --- |
 | `register.go` | `RegisterAll()` -- registers all resources in the global registry |
-| `enrollment.go` | `enrollment status` -- check account enrollment and provisioning state |
+| (no resource file) | `enroll` is a top-level command in `cmd/enroll.go`, not a registered resource — calls the same enrollment-status route and triggers enrollment for new accounts |
 | `organizations.go` | `organizations list` -- list available organizations |
 | `workspaces.go` | `workspaces list` -- list/filter workspaces with automatic cursor pagination |
 | `connectors.go` | `connectors list\|list-available\|describe\|execute\|delete` -- connector management with name->ID resolution hooks |
@@ -88,7 +88,7 @@ The CLI uses a **resource-registry** pattern:
 
 | Resource | Operation | Description | Key Params |
 | --- | --- | --- | --- |
-| `enrollment` | `status` | Check account enrollment | -- |
+| `enroll` (top-level) | -- | Check / trigger account enrollment | -- |
 | `organizations` | `list` | List organizations | -- |
 | `workspaces` | `list` | List/filter workspaces | `name_contains`, `status`, `limit` |
 | `connectors` | `list` | List workspace connectors | `workspace` (required) |

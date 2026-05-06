@@ -34,54 +34,6 @@ func newTestClient(t *testing.T, apiServer *httptest.Server) (c *client.Client, 
 	return c, func() { tokenServer.Close() }
 }
 
-func TestEnrollmentStatus(t *testing.T) {
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/internal/account/enrollment-status" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		if r.Method != http.MethodGet {
-			t.Errorf("unexpected method: %s", r.Method)
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"is_enrolled": true, "provisioning_state": "COMPLETED"}`))
-	}))
-	defer apiServer.Close()
-
-	c, cleanup := newTestClient(t, apiServer)
-	defer cleanup()
-
-	res := &enrollmentResource{}
-	ops := res.Operations()
-	if len(ops) != 1 {
-		t.Fatalf("expected 1 operation, got %d", len(ops))
-	}
-	if ops[0].Name != "status" {
-		t.Errorf("expected operation name 'status', got %q", ops[0].Name)
-	}
-
-	result, err := ops[0].Run(context.Background(), c, map[string]any{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	raw, ok := result.(json.RawMessage)
-	if !ok {
-		t.Fatalf("expected json.RawMessage, got %T", result)
-	}
-
-	var parsed map[string]any
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		t.Fatalf("parsing result: %v", err)
-	}
-	if parsed["is_enrolled"] != true {
-		t.Errorf("expected is_enrolled=true, got %v", parsed["is_enrolled"])
-	}
-}
-
 func TestOrganizationsList(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v1/internal/account/organizations" {
@@ -204,7 +156,6 @@ func TestResourceMetadata(t *testing.T) {
 		wantName string
 		wantDesc string
 	}{
-		{&enrollmentResource{}, "enrollment", "Manage account enrollment"},
 		{&organizationsResource{}, "organizations", "Manage organizations"},
 		{&workspacesResource{}, "workspaces", "Manage workspaces"},
 		{&connectorsResource{}, "connectors", "Manage connectors"},
@@ -226,8 +177,6 @@ func TestResourceMetadata(t *testing.T) {
 // re-run `go generate ./...`.
 func TestEveryOpSpecRefResolves(t *testing.T) {
 	resources := []registry.Resource{
-		&authResource{},
-		&enrollmentResource{},
 		&organizationsResource{},
 		&workspacesResource{},
 		&connectorsResource{},
