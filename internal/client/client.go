@@ -231,17 +231,18 @@ func (c *Client) resolveAPIURL(rawURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("parsing URL: %w", err)
 	}
+	resolvedURL := nextURL
 	if !nextURL.IsAbs() {
-		return apiBase.ResolveReference(nextURL).String(), nil
+		resolvedURL = apiBase.ResolveReference(nextURL)
 	}
-	if nextURL.Scheme != apiBase.Scheme || nextURL.Host != apiBase.Host {
+	if resolvedURL.Scheme != apiBase.Scheme || resolvedURL.Host != apiBase.Host {
 		return "", &APIError{
 			Type:       "validation_error",
 			Message:    "pagination URL points outside the configured API host",
 			StatusCode: 400,
 		}
 	}
-	return nextURL.String(), nil
+	return resolvedURL.String(), nil
 }
 
 func redactURL(rawURL string) string {

@@ -17,7 +17,7 @@ import (
 type connectorsResource struct{}
 
 func (cr *connectorsResource) Name() string        { return "connectors" }
-func (cr *connectorsResource) Description() string { return "Manage connectors" }
+func (cr *connectorsResource) Description() string { return "Create, manage, and execute connectors" }
 func (cr *connectorsResource) Operations() []registry.Operation {
 	return []registry.Operation{
 		connectorsCreateOperation(),
