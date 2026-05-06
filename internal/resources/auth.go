@@ -22,7 +22,7 @@ func (a *authResource) Operations() []registry.Operation {
 			Name:        "login",
 			Description: "Configure credentials interactively",
 			Schema: registry.OperationSchema{
-				Description: "Prompt for client credentials and save them to ~/.airbyte/credentials",
+				Description: "Prompt for client credentials and organization id and save them to ~/.airbyte/settings.json",
 				Params:      map[string]registry.ParamSchema{},
 			},
 			Hooks: registry.OperationHooks{
@@ -36,54 +36,50 @@ func (a *authResource) Operations() []registry.Operation {
 func authLoginInteractive(ctx context.Context, _ *client.Client, params map[string]any) (any, error) {
 	reader := bufio.NewReader(os.Stdin)
 
-	fmt.Fprint(os.Stderr, "Client ID: ")
-	clientID, err := reader.ReadString('\n')
+	clientID, err := promptRequired(reader, "Client ID")
 	if err != nil {
-		return nil, fmt.Errorf("reading client ID: %w", err)
+		return nil, err
 	}
-	clientID = strings.TrimSpace(clientID)
-	if clientID == "" {
-		return nil, &client.APIError{
-			Type:       "validation_error",
-			Message:    "client ID is required",
-			StatusCode: 400,
-		}
+	clientSecret, err := promptRequired(reader, "Client Secret")
+	if err != nil {
+		return nil, err
+	}
+	orgID, err := promptRequired(reader, "Organization ID")
+	if err != nil {
+		return nil, err
 	}
 
-	fmt.Fprint(os.Stderr, "Client Secret: ")
-	clientSecret, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("reading client secret: %w", err)
-	}
-	clientSecret = strings.TrimSpace(clientSecret)
-	if clientSecret == "" {
-		return nil, &client.APIError{
-			Type:       "validation_error",
-			Message:    "client secret is required",
-			StatusCode: 400,
-		}
-	}
-
-	fmt.Fprint(os.Stderr, "Organization ID (leave blank to skip): ")
-	orgID, err := reader.ReadString('\n')
-	if err != nil {
-		return nil, fmt.Errorf("reading organization ID: %w", err)
-	}
-	orgID = strings.TrimSpace(orgID)
-
-	creds := &auth.Credentials{
-		ClientID:       clientID,
-		ClientSecret:   clientSecret,
+	settings := &auth.Settings{
+		Credentials: auth.Credentials{
+			ClientID:     clientID,
+			ClientSecret: clientSecret,
+		},
 		OrganizationID: orgID,
 	}
 
-	if err := auth.WriteCredentialsFile(creds); err != nil {
-		return nil, fmt.Errorf("saving credentials: %w", err)
+	if err := auth.WriteSettingsFile(settings); err != nil {
+		return nil, fmt.Errorf("saving settings: %w", err)
 	}
 
-	result := map[string]string{
+	return map[string]string{
 		"status":  "saved",
-		"message": "Credentials written to ~/.airbyte/credentials",
+		"message": "Settings written to ~/.airbyte/settings.json",
+	}, nil
+}
+
+func promptRequired(reader *bufio.Reader, label string) (string, error) {
+	fmt.Fprintf(os.Stderr, "%s: ", label)
+	value, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("reading %s: %w", label, err)
 	}
-	return result, nil
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", &client.APIError{
+			Type:       "validation_error",
+			Message:    fmt.Sprintf("%s is required", label),
+			StatusCode: 400,
+		}
+	}
+	return value, nil
 }

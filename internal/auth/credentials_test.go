@@ -6,47 +6,49 @@ import (
 	"testing"
 )
 
-func TestResolveCredentials_EnvVars(t *testing.T) {
-	tests := []struct {
-		name       string
-		clientID   string
-		clientSec  string
-		wantID     string
-		wantSecret string
-		wantErr    bool
-	}{
-		{
-			name:       "both env vars set",
-			clientID:   "env-id",
-			clientSec:  "env-secret",
-			wantID:     "env-id",
-			wantSecret: "env-secret",
-		},
-		{
-			name:      "only client_id set",
-			clientID:  "env-id",
-			clientSec: "",
-			wantErr:   true,
-		},
-		{
-			name:      "only client_secret set",
-			clientID:  "",
-			clientSec: "env-secret",
-			wantErr:   true,
-		},
-		{
-			name:    "neither set",
-			wantErr: true,
-		},
-	}
+const validSettingsJSON = `{
+  "settings": {
+    "credentials": {
+      "client_id": "file-id",
+      "client_secret": "file-secret"
+    },
+    "organization_id": "file-org"
+  }
+}`
 
+func writeSettings(t *testing.T, tmpDir, body string) {
+	t.Helper()
+	dir := filepath.Join(tmpDir, ".airbyte")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		t.Fatalf("creating dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "settings.json"), []byte(body), 0o600); err != nil {
+		t.Fatalf("writing settings: %v", err)
+	}
+}
+
+func TestResolveSettings_EnvVars(t *testing.T) {
+	tests := []struct {
+		name      string
+		clientID  string
+		clientSec string
+		orgID     string
+		wantErr   bool
+	}{
+		{name: "all three env vars set", clientID: "env-id", clientSec: "env-secret", orgID: "env-org"},
+		{name: "missing client_id", clientSec: "env-secret", orgID: "env-org", wantErr: true},
+		{name: "missing client_secret", clientID: "env-id", orgID: "env-org", wantErr: true},
+		{name: "missing organization_id", clientID: "env-id", clientSec: "env-secret", wantErr: true},
+		{name: "all empty", wantErr: true},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("HOME", t.TempDir())
 			t.Setenv("AIRBYTE_CLIENT_ID", tt.clientID)
 			t.Setenv("AIRBYTE_CLIENT_SECRET", tt.clientSec)
+			t.Setenv("AIRBYTE_ORGANIZATION_ID", tt.orgID)
 
-			creds, err := ResolveCredentials()
+			s, err := ResolveSettings()
 			if tt.wantErr {
 				if err == nil {
 					t.Fatal("expected error, got nil")
@@ -56,81 +58,116 @@ func TestResolveCredentials_EnvVars(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if creds.ClientID != tt.wantID {
-				t.Errorf("ClientID = %q, want %q", creds.ClientID, tt.wantID)
+			if s.Credentials.ClientID != tt.clientID {
+				t.Errorf("ClientID = %q, want %q", s.Credentials.ClientID, tt.clientID)
 			}
-			if creds.ClientSecret != tt.wantSecret {
-				t.Errorf("ClientSecret = %q, want %q", creds.ClientSecret, tt.wantSecret)
+			if s.Credentials.ClientSecret != tt.clientSec {
+				t.Errorf("ClientSecret = %q, want %q", s.Credentials.ClientSecret, tt.clientSec)
+			}
+			if s.OrganizationID != tt.orgID {
+				t.Errorf("OrganizationID = %q, want %q", s.OrganizationID, tt.orgID)
 			}
 		})
 	}
 }
 
-func TestResolveCredentials_EnvTakesPrecedence(t *testing.T) {
+func TestResolveSettings_EnvTakesPrecedence(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
-
-	dir := filepath.Join(tmpDir, ".airbyte")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatalf("creating dir: %v", err)
-	}
-	content := `{"client_id":"file-id","client_secret":"file-secret"}`
-	if err := os.WriteFile(filepath.Join(dir, "credentials"), []byte(content), 0o600); err != nil {
-		t.Fatalf("writing file: %v", err)
-	}
+	writeSettings(t, tmpDir, validSettingsJSON)
 
 	t.Setenv("AIRBYTE_CLIENT_ID", "env-id")
 	t.Setenv("AIRBYTE_CLIENT_SECRET", "env-secret")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "env-org")
 
-	creds, err := ResolveCredentials()
+	s, err := ResolveSettings()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if creds.ClientID != "env-id" {
-		t.Errorf("expected env ClientID, got %q", creds.ClientID)
+	if s.Credentials.ClientID != "env-id" {
+		t.Errorf("expected env client_id, got %q", s.Credentials.ClientID)
 	}
-	if creds.ClientSecret != "env-secret" {
-		t.Errorf("expected env ClientSecret, got %q", creds.ClientSecret)
+	if s.OrganizationID != "env-org" {
+		t.Errorf("expected env organization_id, got %q", s.OrganizationID)
 	}
 }
 
-func TestResolveCredentials_FallsBackToFile(t *testing.T) {
+func TestResolveSettings_PartialEnvFallsBackToFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeSettings(t, tmpDir, validSettingsJSON)
+
+	// only two of three env vars set — partial env => fall through to file.
+	t.Setenv("AIRBYTE_CLIENT_ID", "env-id")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "env-secret")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.Credentials.ClientID != "file-id" {
+		t.Errorf("expected file client_id, got %q", s.Credentials.ClientID)
+	}
+	if s.OrganizationID != "file-org" {
+		t.Errorf("expected file organization_id, got %q", s.OrganizationID)
+	}
+}
+
+func TestResolveSettings_FileMissingOrganizationID(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 	t.Setenv("AIRBYTE_CLIENT_ID", "")
 	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
 
-	dir := filepath.Join(tmpDir, ".airbyte")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatalf("creating dir: %v", err)
-	}
-	content := `{"client_id":"file-id","client_secret":"file-secret"}`
-	if err := os.WriteFile(filepath.Join(dir, "credentials"), []byte(content), 0o600); err != nil {
-		t.Fatalf("writing file: %v", err)
-	}
+	writeSettings(t, tmpDir, `{
+  "settings": {
+    "credentials": {"client_id": "x", "client_secret": "y"}
+  }
+}`)
 
-	creds, err := ResolveCredentials()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if creds.ClientID != "file-id" {
-		t.Errorf("expected file ClientID, got %q", creds.ClientID)
-	}
-	if creds.ClientSecret != "file-secret" {
-		t.Errorf("expected file ClientSecret, got %q", creds.ClientSecret)
+	if _, err := ResolveSettings(); err == nil {
+		t.Fatal("expected error when organization_id is missing from settings file")
 	}
 }
 
-func TestCredentialsFile_RoundTrip(t *testing.T) {
+func TestResolveSettings_FallsBackToFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+	writeSettings(t, tmpDir, validSettingsJSON)
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if s.Credentials.ClientID != "file-id" {
+		t.Errorf("ClientID = %q, want file-id", s.Credentials.ClientID)
+	}
+	if s.Credentials.ClientSecret != "file-secret" {
+		t.Errorf("ClientSecret = %q, want file-secret", s.Credentials.ClientSecret)
+	}
+	if s.OrganizationID != "file-org" {
+		t.Errorf("OrganizationID = %q, want file-org", s.OrganizationID)
+	}
+}
+
+func TestSettingsFile_RoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	original := &Credentials{ClientID: "test-id", ClientSecret: "test-secret"}
-	if err := WriteCredentialsFile(original); err != nil {
+	original := &Settings{
+		Credentials:    Credentials{ClientID: "test-id", ClientSecret: "test-secret"},
+		OrganizationID: "test-org",
+	}
+	if err := WriteSettingsFile(original); err != nil {
 		t.Fatalf("writing: %v", err)
 	}
 
-	path := filepath.Join(tmpDir, ".airbyte", "credentials")
+	path := filepath.Join(tmpDir, ".airbyte", "settings.json")
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat: %v", err)
@@ -139,34 +176,65 @@ func TestCredentialsFile_RoundTrip(t *testing.T) {
 		t.Errorf("permissions = %o, want 0600", perm)
 	}
 
-	loaded, err := ReadCredentialsFile()
+	loaded, err := ReadSettingsFile()
 	if err != nil {
 		t.Fatalf("reading: %v", err)
 	}
-	if loaded.ClientID != original.ClientID {
-		t.Errorf("ClientID = %q, want %q", loaded.ClientID, original.ClientID)
+	if loaded.Credentials.ClientID != original.Credentials.ClientID {
+		t.Errorf("ClientID = %q, want %q", loaded.Credentials.ClientID, original.Credentials.ClientID)
 	}
-	if loaded.ClientSecret != original.ClientSecret {
-		t.Errorf("ClientSecret = %q, want %q", loaded.ClientSecret, original.ClientSecret)
+	if loaded.Credentials.ClientSecret != original.Credentials.ClientSecret {
+		t.Errorf("ClientSecret = %q, want %q", loaded.Credentials.ClientSecret, original.Credentials.ClientSecret)
+	}
+	if loaded.OrganizationID != original.OrganizationID {
+		t.Errorf("OrganizationID = %q, want %q", loaded.OrganizationID, original.OrganizationID)
 	}
 }
 
-func TestCredentialsFile_InvalidJSON(t *testing.T) {
+func TestSettingsFile_PreservesNestedStructure(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	dir := filepath.Join(tmpDir, ".airbyte")
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		t.Fatalf("creating dir: %v", err)
+	if err := WriteSettingsFile(&Settings{
+		Credentials:    Credentials{ClientID: "a", ClientSecret: "b"},
+		OrganizationID: "c",
+	}); err != nil {
+		t.Fatalf("writing: %v", err)
 	}
 
-	content := "not valid json"
-	if err := os.WriteFile(filepath.Join(dir, "credentials"), []byte(content), 0o600); err != nil {
-		t.Fatalf("writing file: %v", err)
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".airbyte", "settings.json"))
+	if err != nil {
+		t.Fatalf("reading raw: %v", err)
 	}
+	got := string(data)
+	for _, want := range []string{
+		`"settings"`,
+		`"credentials"`,
+		`"client_id": "a"`,
+		`"client_secret": "b"`,
+		`"organization_id": "c"`,
+	} {
+		if !contains(got, want) {
+			t.Errorf("on-disk JSON missing %q\n%s", want, got)
+		}
+	}
+}
 
-	_, err := ReadCredentialsFile()
-	if err == nil {
+func TestSettingsFile_InvalidJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	writeSettings(t, tmpDir, "not valid json")
+
+	if _, err := ReadSettingsFile(); err == nil {
 		t.Fatal("expected error for invalid JSON, got nil")
 	}
+}
+
+func contains(s, sub string) bool {
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }

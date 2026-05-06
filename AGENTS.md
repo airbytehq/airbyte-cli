@@ -80,8 +80,8 @@ The CLI uses a **resource-registry** pattern:
 
 | File | Purpose |
 | --- | --- |
-| `credentials.go` | `ResolveCredentials()` -- env vars first, then `~/.airbyte/credentials` file |
-| `credentials_file.go` | Read/write credentials file with atomic writes and 0600 permission enforcement |
+| `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte/settings.json` |
+| `credentials_file.go` | Read/write `~/.airbyte/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
 | `token.go` | `TokenManager` -- OAuth token acquisition and caching with auto-refresh |
 
 ## Command Surface
@@ -168,24 +168,29 @@ The HTTP client automatically retries transient failures:
 | --- | --- | --- |
 | `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
 | `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
-| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (optional) |
+| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
 
-All three can also be stored in the credentials file (`~/.airbyte/credentials`).
+All three are also stored in the settings file (`~/.airbyte/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file.
 
 ### Configuration
 
 | Variable | Description | Default |
 | --- | --- | --- |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
-| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://cloud.airbyte.com` |
-| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `300` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `180` |
 
-Credentials can also be stored in `~/.airbyte/credentials` (JSON format, 0600 permissions):
+Settings file at `~/.airbyte/settings.json` (JSON format, 0600 permissions):
+
 ```json
 {
-  "client_id": "your-client-id",
-  "client_secret": "your-client-secret",
-  "organization_id": "your-org-id"
+  "settings": {
+    "credentials": {
+      "client_id": "your-client-id",
+      "client_secret": "your-client-secret"
+    },
+    "organization_id": "your-org-id"
+  }
 }
 ```
 
