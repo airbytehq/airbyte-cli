@@ -42,7 +42,7 @@ airbyte schema organizations list
 
 The two surfaces are intentionally separate:
 
-- **`params`** — what you, as a CLI caller, pass via `--json` or per-parameter flags. Includes CLI conveniences (workspace fallback, name/id alternation, etc.).
+- **`params`** — what you, as a CLI caller, pass inside the `--json` payload. Includes CLI conveniences (workspace fallback, name/id alternation, etc.).
 - **`api`** — what bytes go on the wire to the Airbyte API. Use this to know what fields the response will contain and pick `--fields` accordingly.
 
 ## When to use

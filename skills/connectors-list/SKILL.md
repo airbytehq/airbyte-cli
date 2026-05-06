@@ -8,27 +8,25 @@ command: airbyte connectors list
 
 List the connectors that already exist in a given workspace.
 
+> [!IMPORTANT]
+> Always pass parameters as `--json '{...}'`. Per-parameter flags exist for human use; agents should use a single JSON payload for predictable, reviewable inputs.
+
 ## Usage
 
-```
-airbyte connectors list --workspace my-workspace
-airbyte connectors list --workspace my-workspace --format table
-airbyte connectors list                              # falls back to workspace="default"
+```bash
+airbyte connectors list --json '{"workspace": "my-workspace"}'
+
+# workspace defaults to "default" when omitted
+airbyte connectors list --json '{}'
 ```
 
-`workspace` is optional. If omitted, the command falls back to the workspace named `default` and prints a JSON notice on stderr — the API call still proceeds. To target a different workspace, pass `--workspace <name>` (or use `--json '{"workspace": "..."}'`).
+`workspace` is optional. If omitted, the command falls back to the workspace named `default` and prints a JSON notice on stderr — the API call still proceeds. To target a different workspace, set `"workspace": "<name>"` in the JSON payload.
 
 ## When to use
 
 - Confirming a connector exists before calling `describe` or `execute`.
 - Discovering exact connector names to pass to other commands.
 - Checking the status of existing connectors.
-
-## Related commands
-
-- `connectors list-available` — list templates available to install (different command, different purpose).
-- `connectors describe` — inspect a specific connector's entities and actions.
-- `connectors create` — install a new connector from a template.
 
 ## Filtering output
 
@@ -37,18 +35,24 @@ airbyte connectors list                              # falls back to workspace="
 
 Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
-```
-airbyte connectors list --fields id,name              # short form
-airbyte connectors list --fields data.id,data.name    # long form
+```bash
+airbyte connectors list --fields id,name --json '{}'              # short form
+airbyte connectors list --fields data.id,data.name --json '{}'    # long form
 ```
 
 If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
 
+```bash
+airbyte connectors list --fields data.id,next --json '{}'
 ```
-airbyte connectors list --fields data.id,next
-```
+
+## Related commands
+
+- `connectors list-available` — list templates available to install (different command, different purpose).
+- `connectors describe` — inspect a specific connector's entities and actions.
+- `connectors create` — install a new connector from a template.
 
 ## Hints
 
-- Names listed here are case-insensitive but must match exactly when used elsewhere.
-- If two connectors share a name, `execute`/`describe`/`delete` will return a validation error — use `--id` instead.
+- Names returned here can be matched in subsequent commands by connector instance name, template display name, OR template slug — all case-insensitive.
+- If two connectors share a name, `execute`/`describe`/`delete` will return a validation error — pass `"id": "<uuid>"` in the JSON payload instead.

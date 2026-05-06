@@ -6,12 +6,15 @@ command: airbyte connectors list-available
 
 # connectors list-available
 
-List the connector templates available to install in this account. Each template has a `name` (e.g. `salesforce`, `hubspot`) that you pass to `connectors create --name <name>`.
+List the connector templates available to install in this account. Each template has a `name` (e.g. `salesforce`, `hubspot`) that you pass to `connectors create --json '{"name": "<name>"}'`.
+
+> [!IMPORTANT]
+> Always pass parameters as `--json '{...}'` (even when the payload is empty: `--json '{}'`). Agents should not use per-parameter flags.
 
 ## Usage
 
-```
-airbyte connectors list-available --format table
+```bash
+airbyte connectors list-available --json '{}'
 ```
 
 ## When to use
@@ -20,8 +23,8 @@ Always run this **before** `connectors create` to discover the exact template `n
 
 ## Workflow
 
-```
-airbyte connectors list-available --format table
+```bash
+airbyte connectors list-available --json '{}'
 airbyte connectors create --json '{"workspace": "my-workspace", "name": "salesforce"}'
 ```
 
@@ -32,9 +35,9 @@ airbyte connectors create --json '{"workspace": "my-workspace", "name": "salesfo
 
 Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
-```
-airbyte connectors list-available --fields id,name              # short form
-airbyte connectors list-available --fields data.id,data.name    # long form
+```bash
+airbyte connectors list-available --fields id,name --json '{}'              # short form
+airbyte connectors list-available --fields data.id,data.name --json '{}'    # long form
 ```
 
 ## Hints

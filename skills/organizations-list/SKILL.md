@@ -8,11 +8,13 @@ command: airbyte organizations list
 
 List the organizations that the authenticated principal has access to.
 
+> [!IMPORTANT]
+> Always pass parameters as `--json '{...}'` (even when the payload is empty: `--json '{}'`). Agents should not use per-parameter flags.
+
 ## Usage
 
-```
-airbyte organizations list
-airbyte organizations list --format table
+```bash
+airbyte organizations list --json '{}'
 ```
 
 ## Filtering output
@@ -22,15 +24,15 @@ airbyte organizations list --format table
 
 Use the global `--fields` flag to trim the response to specific fields. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
-```
-airbyte organizations list --fields id,organization_name              # short form
-airbyte organizations list --fields data.id,data.organization_name    # long form
+```bash
+airbyte organizations list --fields id,organization_name --json '{}'              # short form
+airbyte organizations list --fields data.id,data.organization_name --json '{}'    # long form
 ```
 
 If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
 
-```
-airbyte organizations list --fields data.id,next
+```bash
+airbyte organizations list --fields data.id,next --json '{}'
 ```
 
 ## When to use
