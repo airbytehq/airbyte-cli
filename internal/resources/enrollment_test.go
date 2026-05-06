@@ -9,6 +9,8 @@ import (
 
 	"github.com/airbytehq/airbyte-cli/internal/auth"
 	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/registry"
+	"github.com/airbytehq/airbyte-cli/internal/spec"
 )
 
 func newTestTokenServer(t *testing.T) *httptest.Server {
@@ -214,6 +216,31 @@ func TestResourceMetadata(t *testing.T) {
 		}
 		if tt.resource.Description() != tt.wantDesc {
 			t.Errorf("expected desc %q, got %q", tt.wantDesc, tt.resource.Description())
+		}
+	}
+}
+
+// TestEveryOpSpecRefResolves asserts that every registered Operation with a
+// non-zero SpecRef points at a route that was extracted into the embedded
+// schema map. Catches the case where someone adds an op but forgets to
+// re-run `go generate ./...`.
+func TestEveryOpSpecRefResolves(t *testing.T) {
+	resources := []registry.Resource{
+		&authResource{},
+		&enrollmentResource{},
+		&organizationsResource{},
+		&workspacesResource{},
+		&connectorsResource{},
+	}
+	for _, res := range resources {
+		for _, op := range res.Operations() {
+			if op.SpecRef.IsZero() {
+				continue
+			}
+			if _, ok := spec.Lookup(op.SpecRef.Key()); !ok {
+				t.Errorf("operation %q on resource %q has SpecRef %q but no extracted schema; run `go generate ./...`",
+					op.Name, res.Name(), op.SpecRef.Key())
+			}
 		}
 	}
 }

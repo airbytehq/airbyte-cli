@@ -41,6 +41,9 @@ The CLI uses a **resource-registry** pattern:
 | `cmd/` | Root Cobra command, persistent flags, version command |
 | `internal/registry/` | Resource/Operation types, dynamic Cobra command builder |
 | `internal/resources/` | All resource implementations |
+| `internal/spec/` | OpenAPI request/response schemas (extracted at build time) |
+| `cmd/extract-schemas/` | Generator: reads `api/*.json` and emits `internal/spec/extracted_gen.go` |
+| `api/` | Checked-in OpenAPI specs (source of truth for the schema feature) |
 | `skills/` | Per-command agent skill documents (`<command>/SKILL.md` with YAML frontmatter) |
 | `internal/client/` | HTTP client with retry logic, structured error types |
 | `internal/auth/` | Credential resolution (env -> file), OAuth token caching |
@@ -196,6 +199,7 @@ When adding a new resource or operation:
 4. If the resource uses name-based lookup, add a `PreRun` hook for server-side ID resolution
 5. Update the **Command Surface** table in this file
 6. If the resource adds a new leaf command, add a corresponding `skills/<command>/SKILL.md` with frontmatter (`name`, `description`, `command`) and task-oriented agent guidance
+7. Set `SpecRef: registry.SpecRef{Path: "...", Method: "..."}` on each operation that maps to an OpenAPI route, then run `go generate ./...` (or `make generate`) so `internal/spec/extracted_gen.go` picks up the new route. CI fails if this file is stale.
 
 ### Adding New Skills
 

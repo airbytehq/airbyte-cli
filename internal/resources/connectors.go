@@ -30,7 +30,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when omitted)"},
 				},
 			},
-			Run: connectorsList,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors", Method: "GET"},
+			Run:     connectorsList,
 		},
 		{
 			Name:        "list-available",
@@ -39,7 +40,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "List all available source connector templates",
 				Params:      map[string]registry.ParamSchema{},
 			},
-			Run: connectorsListAvailable,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/templates/sources", Method: "GET"},
+			Run:     connectorsListAvailable,
 		},
 		{
 			Name:        "describe",
@@ -52,7 +54,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
-			Run: connectorsDescribe,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors/{id}", Method: "GET"},
+			Run:     connectorsDescribe,
 			Hooks: registry.OperationHooks{
 				PreRun: resolveConnectorID,
 			},
@@ -73,7 +76,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 					"exclude_fields": {Type: "array", Required: false, Description: "Fields to exclude from response"},
 				},
 			},
-			Run: connectorsExecute,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors/{id}/execute", Method: "POST"},
+			Run:     connectorsExecute,
 			Hooks: registry.OperationHooks{
 				PreRun: resolveConnectorID,
 			},
@@ -89,7 +93,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
-			Run: connectorsDelete,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors/{id}", Method: "DELETE"},
+			Run:     connectorsDelete,
 			Hooks: registry.OperationHooks{
 				PreRun: resolveConnectorID,
 			},

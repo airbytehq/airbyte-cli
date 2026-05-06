@@ -26,7 +26,8 @@ func (w *workspacesResource) Operations() []registry.Operation {
 					"limit":         {Type: "integer", Required: false, Description: "Max results per page"},
 				},
 			},
-			Run: listWorkspaces,
+			SpecRef: registry.SpecRef{Path: "/api/v1/workspaces", Method: "GET"},
+			Run:     listWorkspaces,
 		},
 	}
 }
