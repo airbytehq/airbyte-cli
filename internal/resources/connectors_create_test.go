@@ -2,9 +2,13 @@ package resources
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -78,45 +82,76 @@ func TestResolveTemplateID_NameNotFound(t *testing.T) {
 	}
 }
 
-func TestResolveWorkspaceID(t *testing.T) {
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data": [{"workspace_id": "ws-123", "name": "My Workspace"}]}`))
-	}))
-	defer apiServer.Close()
-
-	c, cleanup := newTestClient(t, apiServer)
-	defer cleanup()
-
-	id, err := resolveWorkspaceID(context.Background(), c, "My Workspace")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if id != "ws-123" {
-		t.Errorf("expected ws-123, got %s", id)
+// fastPolling overrides the credential-flow polling cadence so tests don't
+// have to wait the production 30-second initial delay. Returns a cleanup
+// function the caller should defer.
+func fastPolling(t *testing.T) func() {
+	t.Helper()
+	oldInitial := initialCredentialPollDelay
+	oldInterval := credentialPollInterval
+	initialCredentialPollDelay = 10 * time.Millisecond
+	credentialPollInterval = 10 * time.Millisecond
+	return func() {
+		initialCredentialPollDelay = oldInitial
+		credentialPollInterval = oldInterval
 	}
 }
 
-func TestResolveWorkspaceID_NotFound(t *testing.T) {
-	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data": []}`))
-	}))
-	defer apiServer.Close()
-
-	c, cleanup := newTestClient(t, apiServer)
-	defer cleanup()
-
-	_, err := resolveWorkspaceID(context.Background(), c, "Missing")
-	if err == nil {
-		t.Fatal("expected error, got nil")
+// makeWidgetTokenB64 builds a base64-encoded widget token whose decoded
+// widgetUrl carries workspaceId=<id>, matching what the real widget-token
+// endpoint returns.
+func makeWidgetTokenB64(t *testing.T, workspaceID, innerToken string) string {
+	t.Helper()
+	payload := map[string]any{
+		"widgetUrl": "https://example.com/widget?workspaceId=" + workspaceID,
+		"token":     innerToken,
 	}
-	apiErr, ok := err.(*client.APIError)
-	if !ok {
-		t.Fatalf("expected *client.APIError, got %T", err)
+	data, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshaling widget token payload: %v", err)
 	}
-	if apiErr.StatusCode != 404 {
-		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	return base64.StdEncoding.EncodeToString(data)
+}
+
+func TestDecodeWidgetToken(t *testing.T) {
+	b64 := makeWidgetTokenB64(t, "ws-abc", "inner-tok")
+	got, err := decodeWidgetToken(b64)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Token != "inner-tok" {
+		t.Errorf("expected token=inner-tok, got %q", got.Token)
+	}
+	if !strings.Contains(got.WidgetURL, "workspaceId=ws-abc") {
+		t.Errorf("expected widgetUrl to contain workspaceId=ws-abc, got %q", got.WidgetURL)
+	}
+}
+
+func TestDecodeWidgetToken_BadBase64(t *testing.T) {
+	if _, err := decodeWidgetToken("not!base64!"); err == nil {
+		t.Fatal("expected error on invalid base64")
+	}
+}
+
+func TestExtractWorkspaceID(t *testing.T) {
+	id, err := extractWorkspaceID("https://example.com/widget?workspaceId=ws-xyz&other=1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if id != "ws-xyz" {
+		t.Errorf("expected ws-xyz, got %q", id)
+	}
+}
+
+func TestExtractWorkspaceID_Missing(t *testing.T) {
+	if _, err := extractWorkspaceID("https://example.com/widget?other=1"); err == nil {
+		t.Fatal("expected error when workspaceId missing")
+	}
+}
+
+func TestExtractWorkspaceID_Empty(t *testing.T) {
+	if _, err := extractWorkspaceID(""); err == nil {
+		t.Fatal("expected error on empty URL")
 	}
 }
 
@@ -125,7 +160,11 @@ func TestConnectorsCreateInteractive_Success(t *testing.T) {
 	openBrowserFunc = func(url string) {}
 	defer func() { openBrowserFunc = old }()
 
+	defer fastPolling(t)()
+
 	t.Setenv("AIRBYTE_CREDENTIAL_TIMEOUT", "10")
+
+	widgetTokenB64 := makeWidgetTokenB64(t, "ws-1", "inner-tok")
 
 	var pollCount atomic.Int32
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -135,13 +174,10 @@ func TestConnectorsCreateInteractive_Success(t *testing.T) {
 			_, _ = w.Write([]byte(`{"data": [{"id": "tmpl-1", "name": "Salesforce"}]}`))
 
 		case r.URL.Path == "/api/v1/integrations/templates/sources/tmpl-1" && r.Method == http.MethodGet:
-			_, _ = w.Write([]byte(`{"id": "tmpl-1", "source_definition_id": "sdef-1", "name": "Salesforce"}`))
-
-		case r.URL.Path == "/api/v1/workspaces" && r.Method == http.MethodGet:
-			_, _ = w.Write([]byte(`{"data": [{"workspace_id": "ws-1", "name": "test-ws"}]}`))
+			_, _ = w.Write([]byte(`{"id": "tmpl-1", "actor_definition_id": "sdef-1", "name": "Salesforce"}`))
 
 		case r.URL.Path == "/api/v1/account/applications/widget-token" && r.Method == http.MethodPost:
-			_, _ = w.Write([]byte(`{"token": "widget-tok"}`))
+			_, _ = fmt.Fprintf(w, `{"token": %q}`, widgetTokenB64)
 
 		case r.URL.Path == "/api/v1/internal/mcp_oauth/sessions" && r.Method == http.MethodPost:
 			_, _ = w.Write([]byte(`{"session_id": "sess-1"}`))
@@ -152,7 +188,10 @@ func TestConnectorsCreateInteractive_Success(t *testing.T) {
 				_, _ = w.Write([]byte(`{"status": "pending"}`))
 				return
 			}
-			_, _ = w.Write([]byte(`{"status": "completed", "credentials": {"api_key": "secret"}}`))
+			_, _ = w.Write([]byte(`{"status": "completed", "auth_payload": {"api_key": "secret"}, "source_template_id": "tmpl-1"}`))
+
+		case r.URL.Path == "/api/v1/internal/mcp_oauth/sessions/sess-1" && r.Method == http.MethodPatch:
+			_, _ = w.Write([]byte(`{"session_id": "sess-1", "source_id": "conn-new"}`))
 
 		case r.URL.Path == "/api/v1/integrations/connectors" && r.Method == http.MethodPost:
 			_, _ = w.Write([]byte(`{"id": "conn-new", "name": "Salesforce", "status": "active"}`))
@@ -197,19 +236,20 @@ func TestConnectorsCreateInteractive_Timeout(t *testing.T) {
 	openBrowserFunc = func(url string) {}
 	defer func() { openBrowserFunc = old }()
 
+	defer fastPolling(t)()
+
 	t.Setenv("AIRBYTE_CREDENTIAL_TIMEOUT", "3")
+
+	widgetTokenB64 := makeWidgetTokenB64(t, "ws-1", "inner-tok")
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/v1/integrations/templates/sources/tmpl-1" && r.Method == http.MethodGet:
-			_, _ = w.Write([]byte(`{"id": "tmpl-1", "source_definition_id": "sdef-1"}`))
-
-		case r.URL.Path == "/api/v1/workspaces":
-			_, _ = w.Write([]byte(`{"data": [{"workspace_id": "ws-1", "name": "test-ws"}]}`))
+			_, _ = w.Write([]byte(`{"id": "tmpl-1", "actor_definition_id": "sdef-1"}`))
 
 		case r.URL.Path == "/api/v1/account/applications/widget-token":
-			_, _ = w.Write([]byte(`{"token": "tok"}`))
+			_, _ = fmt.Fprintf(w, `{"token": %q}`, widgetTokenB64)
 
 		case r.URL.Path == "/api/v1/internal/mcp_oauth/sessions" && r.Method == http.MethodPost:
 			_, _ = w.Write([]byte(`{"session_id": "sess-1"}`))
@@ -259,19 +299,20 @@ func TestConnectorsCreateInteractive_CredentialFlowFailed(t *testing.T) {
 	openBrowserFunc = func(url string) {}
 	defer func() { openBrowserFunc = old }()
 
+	defer fastPolling(t)()
+
 	t.Setenv("AIRBYTE_CREDENTIAL_TIMEOUT", "10")
+
+	widgetTokenB64 := makeWidgetTokenB64(t, "ws-1", "inner-tok")
 
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/v1/integrations/templates/sources/tmpl-1" && r.Method == http.MethodGet:
-			_, _ = w.Write([]byte(`{"id": "tmpl-1", "source_definition_id": "sdef-1"}`))
-
-		case r.URL.Path == "/api/v1/workspaces":
-			_, _ = w.Write([]byte(`{"data": [{"workspace_id": "ws-1", "name": "test-ws"}]}`))
+			_, _ = w.Write([]byte(`{"id": "tmpl-1", "actor_definition_id": "sdef-1"}`))
 
 		case r.URL.Path == "/api/v1/account/applications/widget-token":
-			_, _ = w.Write([]byte(`{"token": "tok"}`))
+			_, _ = fmt.Fprintf(w, `{"token": %q}`, widgetTokenB64)
 
 		case r.URL.Path == "/api/v1/internal/mcp_oauth/sessions" && r.Method == http.MethodPost:
 			_, _ = w.Write([]byte(`{"session_id": "sess-1"}`))
@@ -326,14 +367,51 @@ func TestCredentialTimeout(t *testing.T) {
 }
 
 func TestCredentialURL(t *testing.T) {
-	got, err := credentialURL("https://cloud.airbyte.com/base", "session/1", "tok&en")
+	got, err := credentialURL("https://cloud.airbyte.com", credentialURLParams{
+		WidgetTokenB64:     "abc&def",
+		SessionID:          "sess/1",
+		TemplateID:         "tmpl-1",
+		UseGlobalTemplates: true,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	want := "https://cloud.airbyte.com/base/embedded-widget/credentials?session_id=session%2F1&token=tok%26en"
-	if got != want {
-		t.Errorf("credentialURL = %q, want %q", got, want)
+	u, err := url.Parse(got)
+	if err != nil {
+		t.Fatalf("parsing result: %v", err)
+	}
+	if u.Path != "/widget-bridge" {
+		t.Errorf("expected path /widget-bridge, got %q", u.Path)
+	}
+	q := u.Query()
+	if q.Get("widget_token") != "abc&def" {
+		t.Errorf("widget_token wrong: %q", q.Get("widget_token"))
+	}
+	if q.Get("session") != "sess/1" {
+		t.Errorf("session wrong: %q", q.Get("session"))
+	}
+	if q.Get("selectedTemplateId") != "tmpl-1" {
+		t.Errorf("selectedTemplateId wrong: %q", q.Get("selectedTemplateId"))
+	}
+	if q.Get("showEntityPicker") != "true" {
+		t.Errorf("showEntityPicker wrong: %q", q.Get("showEntityPicker"))
+	}
+	if q.Get("useGlobalTemplates") != "true" {
+		t.Errorf("useGlobalTemplates wrong: %q", q.Get("useGlobalTemplates"))
+	}
+}
+
+func TestCredentialURL_OmitsGlobalWhenFalse(t *testing.T) {
+	got, err := credentialURL("https://cloud.airbyte.com", credentialURLParams{
+		WidgetTokenB64: "tok", SessionID: "s", TemplateID: "t",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	u, _ := url.Parse(got)
+	if u.Query().Has("useGlobalTemplates") {
+		t.Errorf("useGlobalTemplates should be absent when UseGlobalTemplates=false; got %q", u.Query().Get("useGlobalTemplates"))
 	}
 }
 
