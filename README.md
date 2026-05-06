@@ -60,15 +60,15 @@ go build -o airbyte .
 
 ## Configure
 
-Credentials can be supplied via environment variables or a credentials file at `~/.airbyte/credentials` (JSON, `0600` permissions).
+Settings can be supplied via environment variables or a settings file at `~/.airbyte/settings.json` (JSON, `0600` permissions). Three pieces of information are always required: client ID, client secret, and organization ID.
 
 ### Resolution order
 
-1. **Environment variables** — used if both `AIRBYTE_CLIENT_ID` and `AIRBYTE_CLIENT_SECRET` are set. If either is missing, the CLI falls through to the file.
-2. **Credentials file** at `~/.airbyte/credentials`.
+1. **Environment variables** — used only if **all three** of `AIRBYTE_CLIENT_ID`, `AIRBYTE_CLIENT_SECRET`, and `AIRBYTE_ORGANIZATION_ID` are set. If any is missing, the CLI falls through to the file.
+2. **Settings file** at `~/.airbyte/settings.json`. All three fields must be populated.
 3. If neither is configured, the CLI exits with an authentication error.
 
-Env vars take precedence over the file when both are present, so they're useful for one-off overrides (e.g. `AIRBYTE_CLIENT_ID=... airbyte ...`).
+Env vars take precedence over the file when all three are present, so they're useful for one-off overrides (e.g. `AIRBYTE_ORGANIZATION_ID=... airbyte ...`).
 
 ### Environment variables
 
@@ -76,20 +76,28 @@ Env vars take precedence over the file when both are present, so they're useful 
 | --- | --- | --- |
 | `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
 | `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
-| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (optional) |
+| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
-| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://cloud.airbyte.com` |
-| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `300` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `180` |
 
-### Credentials file
+### Settings file
+
+`~/.airbyte/settings.json`:
 
 ```json
 {
-  "client_id": "your-client-id",
-  "client_secret": "your-client-secret",
-  "organization_id": "your-org-id"
+  "settings": {
+    "credentials": {
+      "client_id": "your-client-id",
+      "client_secret": "your-client-secret"
+    },
+    "organization_id": "your-org-id"
+  }
 }
 ```
+
+Run `airbyte auth login` to be prompted for these values and have the file written for you with the right permissions.
 
 ## Usage
 
