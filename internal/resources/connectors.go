@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -14,7 +17,7 @@ import (
 type connectorsResource struct{}
 
 func (cr *connectorsResource) Name() string        { return "connectors" }
-func (cr *connectorsResource) Description() string { return "Manage connectors" }
+func (cr *connectorsResource) Description() string { return "Create, manage, and execute connectors" }
 func (cr *connectorsResource) Operations() []registry.Operation {
 	return []registry.Operation{
 		connectorsCreateOperation(),
@@ -22,12 +25,13 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 			Name:        "list",
 			Description: "List connectors in a workspace",
 			Schema: registry.OperationSchema{
-				Description: "List all connectors for a workspace",
+				Description: "List all connectors for a workspace. If 'workspace' is omitted, falls back to 'default'.",
 				Params: map[string]registry.ParamSchema{
-					"workspace": {Type: "string", Required: true, Description: "Workspace name"},
+					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when omitted)"},
 				},
 			},
-			Run: connectorsList,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors", Method: "GET"},
+			Run:     connectorsList,
 		},
 		{
 			Name:        "list-available",
@@ -36,7 +40,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "List all available source connector templates",
 				Params:      map[string]registry.ParamSchema{},
 			},
-			Run: connectorsListAvailable,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/templates/sources", Method: "GET"},
+			Run:     connectorsListAvailable,
 		},
 		{
 			Name:        "describe",
@@ -45,11 +50,12 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "Get connector details and schema description",
 				Params: map[string]registry.ParamSchema{
 					"name":      {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
-					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
+					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when used with name)"},
 					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
-			Run: connectorsDescribe,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors/{id}", Method: "GET"},
+			Run:     connectorsDescribe,
 			Hooks: registry.OperationHooks{
 				PreRun: resolveConnectorID,
 			},
@@ -70,7 +76,8 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 					"exclude_fields": {Type: "array", Required: false, Description: "Fields to exclude from response"},
 				},
 			},
-			Run: connectorsExecute,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors/{id}/execute", Method: "POST"},
+			Run:     connectorsExecute,
 			Hooks: registry.OperationHooks{
 				PreRun: resolveConnectorID,
 			},
@@ -82,11 +89,12 @@ func (cr *connectorsResource) Operations() []registry.Operation {
 				Description: "Delete a connector by name or ID",
 				Params: map[string]registry.ParamSchema{
 					"name":      {Type: "string", Required: false, Description: "Connector name (requires workspace)"},
-					"workspace": {Type: "string", Required: false, Description: "Workspace name (required when using name)"},
+					"workspace": {Type: "string", Required: false, Description: "Workspace name (defaults to 'default' when used with name)"},
 					"id":        {Type: "string", Required: false, Description: "Connector ID (alternative to name)"},
 				},
 			},
-			Run: connectorsDelete,
+			SpecRef: registry.SpecRef{Path: "/api/v1/integrations/connectors/{id}", Method: "DELETE"},
+			Run:     connectorsDelete,
 			Hooks: registry.OperationHooks{
 				PreRun: resolveConnectorID,
 			},
@@ -117,35 +125,40 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 		return params, nil
 	}
 
-	workspaceName, _ := params["workspace"].(string)
-	if workspaceName == "" {
-		return nil, client.NewValidationError(
-			"workspace is required when using name",
-			"run 'airbyte workspaces list' to find workspace names",
-		)
-	}
+	workspaceName := applyDefaultWorkspace(c, params)
 
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
-		"customer_name": workspaceName,
+		"workspace_name": workspaceName,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	var resp struct {
-		Data []struct {
-			ID   string `json:"id"`
-			Name string `json:"name"`
-		} `json:"data"`
-	}
+	var resp connectorLookupResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("parsing connectors list: %w", err)
 	}
 
+	// Accept matches against the connector instance name, the template's
+	// display name, OR the template's slug — users may type any of these.
+	// Deduplicate so a single connector matched by multiple fields counts
+	// once.
+	seen := map[string]bool{}
 	var matches []string
 	for _, conn := range resp.Data {
-		if strings.EqualFold(conn.Name, name) {
-			matches = append(matches, conn.ID)
+		candidates := []string{
+			conn.Name,
+			conn.SummarizedSourceTemplate.Name,
+			conn.SummarizedSourceTemplate.ConnectorName,
+		}
+		for _, candidate := range candidates {
+			if candidate != "" && strings.EqualFold(candidate, name) {
+				if !seen[conn.ID] {
+					matches = append(matches, conn.ID)
+					seen[conn.ID] = true
+				}
+				break
+			}
 		}
 	}
 
@@ -166,10 +179,49 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 	}
 }
 
+// fallbackWorkspaceName is the last-resort default applied when neither
+// the caller nor the user's settings.json supply a workspace. It matches
+// the API's own default-workspace convention for new accounts.
+const fallbackWorkspaceName = "default"
+
+// statusWriter is the stream where the connectors resource prints user-facing
+// status messages (e.g. the workspace fallback notice). Tests override it to
+// capture output without touching os.Stderr.
+var statusWriter io.Writer = os.Stderr
+
+// applyDefaultWorkspace resolves params["workspace"], falling back to the
+// user's configured default (from ~/.airbyte/settings.json, exposed on the
+// client) and ultimately to the literal "default" if neither is set. When
+// the fallback engages, a JSON notice is printed to stderr so users can see
+// which workspace was actually used.
+func applyDefaultWorkspace(c *client.Client, params map[string]any) string {
+	name, _ := params["workspace"].(string)
+	if name != "" {
+		return name
+	}
+	resolved := configuredDefaultWorkspace(c)
+	notice, _ := json.Marshal(map[string]string{
+		"message":   fmt.Sprintf("no workspace provided; falling back to %q", resolved),
+		"workspace": resolved,
+	})
+	fmt.Fprintln(statusWriter, string(notice))
+	params["workspace"] = resolved
+	return resolved
+}
+
+func configuredDefaultWorkspace(c *client.Client) string {
+	if c != nil {
+		if name := c.DefaultWorkspace(); name != "" {
+			return name
+		}
+	}
+	return fallbackWorkspaceName
+}
+
 func connectorsList(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-	workspaceName, _ := params["workspace"].(string)
+	workspaceName := applyDefaultWorkspace(c, params)
 	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
-		"customer_name": workspaceName,
+		"workspace_name": workspaceName,
 	})
 	if err != nil {
 		return nil, err
@@ -187,8 +239,8 @@ func connectorsListAvailable(ctx context.Context, c *client.Client, params map[s
 
 func connectorsDescribe(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	id, _ := params["id"].(string)
-	path := fmt.Sprintf("/api/v1/integrations/connectors/%s", id)
-	execPath := fmt.Sprintf("/api/v1/integrations/connectors/%s/execute", id)
+	path := connectorPath(id)
+	execPath := path + "/execute"
 
 	type result struct {
 		data json.RawMessage
@@ -227,12 +279,15 @@ func connectorsDescribe(ctx context.Context, c *client.Client, params map[string
 		return nil, fmt.Errorf("parsing connector: %w", err)
 	}
 
-	if describeResult.err == nil {
-		var schema any
-		if err := json.Unmarshal(describeResult.data, &schema); err == nil {
-			connector["schema"] = schema
-		}
+	if describeResult.err != nil {
+		return nil, describeResult.err
 	}
+
+	var schema any
+	if err := json.Unmarshal(describeResult.data, &schema); err != nil {
+		return nil, fmt.Errorf("parsing connector schema: %w", err)
+	}
+	connector["schema"] = schema
 
 	return connector, nil
 }
@@ -256,7 +311,7 @@ func connectorsExecute(ctx context.Context, c *client.Client, params map[string]
 		body["exclude_fields"] = ef
 	}
 
-	execPath := fmt.Sprintf("/api/v1/integrations/connectors/%s/execute", id)
+	execPath := connectorPath(id) + "/execute"
 	raw, err := c.Post(ctx, execPath, body)
 	if err != nil {
 		return nil, err
@@ -266,10 +321,14 @@ func connectorsExecute(ctx context.Context, c *client.Client, params map[string]
 
 func connectorsDelete(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	id, _ := params["id"].(string)
-	path := fmt.Sprintf("/api/v1/integrations/connectors/%s", id)
+	path := connectorPath(id)
 	raw, err := c.Delete(ctx, path)
 	if err != nil {
 		return nil, err
 	}
 	return raw, nil
+}
+
+func connectorPath(id string) string {
+	return "/api/v1/integrations/connectors/" + url.PathEscape(id)
 }

@@ -15,11 +15,16 @@ func main() {
 	cfg := config.Load()
 
 	var c *client.Client
-	if creds, err := auth.ResolveCredentials(); err == nil {
-		tm := auth.NewTokenManager(cfg.APIHost, creds.OrganizationID, creds)
-		c = client.New(cfg.APIHost, creds.OrganizationID, cmd.Version, tm, client.WithDebug(cmd.GetVerbose()))
+	if settings, err := auth.ResolveSettings(); err == nil {
+		creds := settings.Credentials
+		tm := auth.NewTokenManager(cfg.APIHost, settings.OrganizationID, &creds)
+		c = client.New(cfg.APIHost, settings.OrganizationID, cmd.Version, tm,
+			client.WithDebugFunc(cmd.GetVerbose),
+			client.WithDefaultWorkspace(settings.Workspace),
+		)
 	}
 
+	cmd.SetAPIClient(c)
 	resources.RegisterAll()
 	registry.Build(cmd.GetRootCmd(), c, cmd.FlagAccessor())
 

@@ -6,10 +6,13 @@ LDFLAGS = -X github.com/airbytehq/airbyte-cli/cmd.Version=$(VERSION) \
           -X github.com/airbytehq/airbyte-cli/cmd.Commit=$(COMMIT) \
           -X github.com/airbytehq/airbyte-cli/cmd.Date=$(DATE)
 
-.PHONY: build test lint install clean
+.PHONY: build generate test lint install clean
 
-build:
+build: generate
 	go build -ldflags "$(LDFLAGS)" -o airbyte .
+
+generate:
+	go generate ./...
 
 test:
 	go test ./... -v

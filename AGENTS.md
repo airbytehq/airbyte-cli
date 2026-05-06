@@ -41,6 +41,9 @@ The CLI uses a **resource-registry** pattern:
 | `cmd/` | Root Cobra command, persistent flags, version command |
 | `internal/registry/` | Resource/Operation types, dynamic Cobra command builder |
 | `internal/resources/` | All resource implementations |
+| `internal/spec/` | OpenAPI request/response schemas (extracted at build time) |
+| `cmd/extract-schemas/` | Generator: reads `api/*.json` and emits `internal/spec/extracted_gen.go` |
+| `api/` | Checked-in OpenAPI specs (source of truth for the schema feature) |
 | `skills/` | Per-command agent skill documents (`<command>/SKILL.md` with YAML frontmatter) |
 | `internal/client/` | HTTP client with retry logic, structured error types |
 | `internal/auth/` | Credential resolution (env -> file), OAuth token caching |
@@ -53,14 +56,14 @@ The CLI uses a **resource-registry** pattern:
 | --- | --- |
 | `types.go` | `Resource` interface, `Operation` struct, `OperationSchema`, `ParamSchema`, `OperationHooks` |
 | `registry.go` | Thread-safe global registry: `Register()`, `All()`, `Get()`, `Reset()` |
-| `builder.go` | Converts registered resources into Cobra commands with `--json`, `--id`, `--describe`, file input (`@filename`), parameter validation, and hook execution |
+| `builder.go` | Converts registered resources into Cobra commands with per-parameter flags, `--json`, `--describe`, file input (`@filename`), parameter validation, and hook execution |
 
 ### Resources (`internal/resources/`)
 
 | File | Purpose |
 | --- | --- |
 | `register.go` | `RegisterAll()` -- registers all resources in the global registry |
-| `enrollment.go` | `enrollment status` -- check account enrollment and provisioning state |
+| (no resource file) | `enroll` is a top-level command in `cmd/enroll.go`, not a registered resource — calls the same enrollment-status route and triggers enrollment for new accounts |
 | `organizations.go` | `organizations list` -- list available organizations |
 | `workspaces.go` | `workspaces list` -- list/filter workspaces with automatic cursor pagination |
 | `connectors.go` | `connectors list\|list-available\|describe\|execute\|delete` -- connector management with name->ID resolution hooks |
@@ -77,25 +80,25 @@ The CLI uses a **resource-registry** pattern:
 
 | File | Purpose |
 | --- | --- |
-| `credentials.go` | `ResolveCredentials()` -- env vars first, then `~/.airbyte/credentials` file |
-| `credentials_file.go` | Read/write credentials file with atomic writes and 0600 permission enforcement |
+| `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte/settings.json` |
+| `credentials_file.go` | Read/write `~/.airbyte/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
 | `token.go` | `TokenManager` -- OAuth token acquisition and caching with auto-refresh |
 
 ## Command Surface
 
 | Resource | Operation | Description | Key Params |
 | --- | --- | --- | --- |
-| `enrollment` | `status` | Check account enrollment | -- |
+| `enroll` (top-level) | -- | Check / trigger account enrollment | -- |
 | `organizations` | `list` | List organizations | -- |
 | `workspaces` | `list` | List/filter workspaces | `name_contains`, `status`, `limit` |
 | `connectors` | `list` | List workspace connectors | `workspace` (required) |
 | `connectors` | `list-available` | List connector templates | -- |
 | `connectors` | `describe` | Get connector details + schema | `name`+`workspace` or `--id` |
 | `connectors` | `execute` | Execute a connector action | `name`+`workspace` or `--id`, `entity`, `action`, `params` |
-| `connectors` | `create` | Interactive credential flow | `workspace`, `template_name` or `template_id` |
+| `connectors` | `create` | Interactive credential flow | `workspace`, `name` (template) or `id` (template ID) |
 | `connectors` | `delete` | Delete a connector | `name`+`workspace` or `--id` |
 
-### Global Flags
+### Common Flags
 
 | Flag | Description | Default |
 | --- | --- | --- |
@@ -103,8 +106,9 @@ The CLI uses a **resource-registry** pattern:
 | `--describe` | Print operation schema and exit (do not execute) | `false` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
-| `--json` | Inline JSON parameters | -- |
-| `--id` | Convenience flag for resource ID | -- |
+| `--json` | Operation flag for inline JSON parameters; mutually exclusive with per-parameter flags | -- |
+| `--<param>` | Per-parameter operation flags generated from each scalar/array schema parameter, e.g. `--id`, `--workspace`, `--select-fields` | -- |
+| `--fields` | Client-side response filter (comma-separated dotted paths, e.g. `data.id,data.name`). Applied in `writeResult` after `Run`; bypasses error payloads. | -- |
 
 ## Credential Security
 
@@ -164,26 +168,35 @@ The HTTP client automatically retries transient failures:
 | --- | --- | --- |
 | `AIRBYTE_CLIENT_ID` | OAuth client ID | (required) |
 | `AIRBYTE_CLIENT_SECRET` | OAuth client secret | (required) |
-| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (optional) |
+| `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
+| `AIRBYTE_WORKSPACE` | Default workspace name | `default` |
 
-All three can also be stored in the credentials file (`~/.airbyte/credentials`).
+All three are also stored in the settings file (`~/.airbyte/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file.
 
 ### Configuration
 
 | Variable | Description | Default |
 | --- | --- | --- |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
-| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://cloud.airbyte.com` |
-| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `300` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `180` |
 
-Credentials can also be stored in `~/.airbyte/credentials` (JSON format, 0600 permissions):
+Settings file at `~/.airbyte/settings.json` (JSON format, 0600 permissions):
+
 ```json
 {
-  "client_id": "your-client-id",
-  "client_secret": "your-client-secret",
-  "organization_id": "your-org-id"
+  "settings": {
+    "credentials": {
+      "client_id": "your-client-id",
+      "client_secret": "your-client-secret"
+    },
+    "organization_id": "your-org-id",
+    "workspace": "default"
+  }
 }
 ```
+
+`workspace` is optional. When absent or empty, commands that take a `workspace` parameter without receiving one fall back to the literal `"default"`. Resources read the configured value via `client.Client.DefaultWorkspace()`, which `main.go` populates from `Settings.Workspace`.
 
 ## Adding New Resources
 
@@ -195,6 +208,7 @@ When adding a new resource or operation:
 4. If the resource uses name-based lookup, add a `PreRun` hook for server-side ID resolution
 5. Update the **Command Surface** table in this file
 6. If the resource adds a new leaf command, add a corresponding `skills/<command>/SKILL.md` with frontmatter (`name`, `description`, `command`) and task-oriented agent guidance
+7. Set `SpecRef: registry.SpecRef{Path: "...", Method: "..."}` on each operation that maps to an OpenAPI route, then run `go generate ./...` (or `make generate`) so `internal/spec/extracted_gen.go` picks up the new route. CI fails if this file is stale.
 
 ### Adding New Skills
 

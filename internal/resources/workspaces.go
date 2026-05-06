@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
+	"github.com/airbytehq/airbyte-cli/internal/auth"
 	"github.com/airbytehq/airbyte-cli/internal/client"
 	"github.com/airbytehq/airbyte-cli/internal/registry"
 )
@@ -26,9 +29,96 @@ func (w *workspacesResource) Operations() []registry.Operation {
 					"limit":         {Type: "integer", Required: false, Description: "Max results per page"},
 				},
 			},
-			Run: listWorkspaces,
+			SpecRef: registry.SpecRef{Path: "/api/v1/workspaces", Method: "GET"},
+			Run:     listWorkspaces,
+		},
+		{
+			Name:        "use",
+			Description: "Set the default workspace stored in ~/.airbyte/settings.json",
+			Schema: registry.OperationSchema{
+				Description: "Update settings.json so subsequent commands that don't pass `workspace` use this name. The workspace must exist (the command verifies via the API before writing).",
+				Params: map[string]registry.ParamSchema{
+					"name": {Type: "string", Required: true, Description: "Workspace name to use as the default"},
+				},
+			},
+			Run: useWorkspace,
 		},
 	}
+}
+
+// useWorkspace updates Settings.Workspace in ~/.airbyte/settings.json.
+// It verifies the workspace exists via the API first, so users can't save a
+// typo'd or nonexistent name. The canonical case from the API response is
+// what gets persisted.
+func useWorkspace(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+	name, _ := params["name"].(string)
+	if name == "" {
+		return nil, client.NewValidationError(
+			"workspace name is required",
+			`pass --json '{"name": "<workspace>"}'`,
+		)
+	}
+
+	canonical, err := lookupWorkspaceName(ctx, c, name)
+	if err != nil {
+		return nil, err
+	}
+
+	settings, err := auth.ReadSettingsFile()
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, client.NewNotFoundError(
+				"settings file does not exist",
+				"run 'airbyte configure' first to create ~/.airbyte/settings.json",
+			)
+		}
+		return nil, fmt.Errorf("reading settings: %w", err)
+	}
+
+	settings.Workspace = canonical
+	if err := auth.WriteSettingsFile(settings); err != nil {
+		return nil, fmt.Errorf("writing settings: %w", err)
+	}
+
+	return map[string]any{
+		"status":    "saved",
+		"workspace": canonical,
+		"message":   fmt.Sprintf("default workspace set to %q in ~/.airbyte/settings.json", canonical),
+	}, nil
+}
+
+// lookupWorkspaceName confirms a workspace with the given name exists and
+// returns its canonical-cased name. Match is case-insensitive (so the user
+// can type "Default" and we'll accept "default").
+func lookupWorkspaceName(ctx context.Context, c *client.Client, name string) (string, error) {
+	raw, err := c.Get(ctx, "/api/v1/workspaces", map[string]string{
+		"name_contains": name,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	var page workspaceListPage
+	if err := json.Unmarshal(raw, &page); err != nil {
+		return "", fmt.Errorf("parsing workspaces: %w", err)
+	}
+
+	for _, item := range page.Data {
+		var ws struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(item, &ws); err != nil {
+			continue
+		}
+		if strings.EqualFold(ws.Name, name) {
+			return ws.Name, nil
+		}
+	}
+
+	return "", client.NewNotFoundError(
+		fmt.Sprintf("workspace %q not found", name),
+		"run 'airbyte workspaces list' to see available workspaces",
+	)
 }
 
 func listWorkspaces(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
@@ -51,10 +141,7 @@ func listWorkspaces(ctx context.Context, c *client.Client, params map[string]any
 	}
 
 	for {
-		var page struct {
-			Data []json.RawMessage `json:"data"`
-			Next *string           `json:"next"`
-		}
+		var page workspaceListPage
 		if err := json.Unmarshal(raw, &page); err != nil {
 			return raw, nil
 		}

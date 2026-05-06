@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/airbytehq/airbyte-cli/internal/client"
@@ -21,6 +22,7 @@ type stubFlags struct {
 	format   string
 	output   string
 	describe bool
+	fields   []string
 }
 
 func (s *stubFlags) GetFormat() string {
@@ -33,6 +35,10 @@ func (s *stubFlags) GetOutput() string {
 
 func (s *stubFlags) GetDescribe() bool {
 	return s.describe
+}
+
+func (s *stubFlags) GetFields() []string {
+	return s.fields
 }
 
 func newTestRoot() *cobra.Command {
@@ -275,8 +281,8 @@ func TestMissingRequiredParamReturnsValidationError(t *testing.T) {
 		t.Fatalf("parsing error output: %v (output: %s)", err, buf.String())
 	}
 
-	if result["error"] != "validation_error" {
-		t.Errorf("expected error 'validation_error', got %v", result["error"])
+	if result["type"] != "validation_error" {
+		t.Errorf("expected type 'validation_error', got %v", result["type"])
 	}
 
 	fields, ok := result["fields"].(map[string]any)
@@ -602,7 +608,665 @@ func TestNilClientReturnsAuthError(t *testing.T) {
 		t.Fatalf("parsing error output: %v (output: %s)", err, buf.String())
 	}
 
-	if result["error"] != "auth_error" {
-		t.Errorf("expected error 'auth_error', got %v", result["error"])
+	if result["type"] != "auth_error" {
+		t.Errorf("expected type 'auth_error', got %v", result["type"])
+	}
+}
+
+// registerMixedTypeOp registers a mock operation with one parameter of each
+// supported scalar type plus an array — used by several flag-mode tests.
+func registerMixedTypeOp(captured *map[string]any) {
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name:        "do",
+			Description: "Do thing",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"workspace":     {Type: "string", Required: true, Description: "Workspace name"},
+					"name":          {Type: "string", Required: false, Description: "Thing name"},
+					"limit":         {Type: "integer", Required: false, Description: "Limit"},
+					"dry_run":       {Type: "bool", Required: false, Description: "Dry run"},
+					"select_fields": {Type: "array", Required: false, Description: "Fields"},
+					"params":        {Type: "object", Required: false, Description: "Free-form payload"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				*captured = params
+				return map[string]string{"ok": "yes"}, nil
+			},
+		},
+	))
+}
+
+func TestParamFlagsString(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+
+	root.SetArgs([]string{"things", "do", "--workspace", "prod", "--name", "thing-1"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if captured["workspace"] != "prod" {
+		t.Errorf("expected workspace='prod', got %v", captured["workspace"])
+	}
+	if captured["name"] != "thing-1" {
+		t.Errorf("expected name='thing-1', got %v", captured["name"])
+	}
+}
+
+func TestParamFlagsTypeBindings(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--workspace", "prod",
+		"--limit", "42",
+		"--dry-run",
+		"--select-fields", "id,name,email",
+	})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if captured["limit"] != 42 {
+		t.Errorf("expected limit=42 (int), got %v (%T)", captured["limit"], captured["limit"])
+	}
+	if captured["dry_run"] != true {
+		t.Errorf("expected dry_run=true, got %v", captured["dry_run"])
+	}
+	arr, ok := captured["select_fields"].([]any)
+	if !ok {
+		t.Fatalf("expected select_fields []any, got %T", captured["select_fields"])
+	}
+	if len(arr) != 3 || arr[0] != "id" || arr[2] != "email" {
+		t.Errorf("unexpected select_fields contents: %v", arr)
+	}
+}
+
+func TestParamFlagsKebabCase(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: filepath.Join(t.TempDir(), "out.json")})
+
+	cmd, _, _ := root.Find([]string{"things", "do"})
+	if cmd.Flags().Lookup("dry-run") == nil {
+		t.Error("expected --dry-run flag (kebab-case for dry_run)")
+	}
+	if cmd.Flags().Lookup("select-fields") == nil {
+		t.Error("expected --select-fields flag (kebab-case for select_fields)")
+	}
+	if cmd.Flags().Lookup("dry_run") != nil {
+		t.Error("did not expect --dry_run (snake_case form)")
+	}
+}
+
+func TestObjectParamRegistersAsJSONStringFlag(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	cmd, _, _ := root.Find([]string{"things", "do"})
+	flag := cmd.Flags().Lookup("params")
+	if flag == nil {
+		t.Fatal("expected --params flag for object-typed param")
+	}
+	if flag.Value.Type() != "string" {
+		t.Errorf("expected --params to be a string flag (JSON input), got %s", flag.Value.Type())
+	}
+	if !strings.Contains(flag.Usage, "JSON object") {
+		t.Errorf("expected --params usage to mention 'JSON object', got %q", flag.Usage)
+	}
+}
+
+func TestObjectParamUnmarshalsJSON(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--workspace", "ws",
+		"--params", `{"limit": 50, "filters": ["a", "b"]}`,
+	})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := captured["params"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected params to be a map, got %T (%v)", captured["params"], captured["params"])
+	}
+	if got["limit"] != float64(50) { // JSON numbers decode as float64
+		t.Errorf("expected limit=50, got %v", got["limit"])
+	}
+	filters, ok := got["filters"].([]any)
+	if !ok || len(filters) != 2 || filters[0] != "a" {
+		t.Errorf("expected filters=[a,b], got %v", got["filters"])
+	}
+}
+
+func TestObjectParamRejectsInvalidJSON(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--workspace", "ws",
+		"--params", `not-json`,
+	})
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not be called when --params JSON is invalid")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	var errPayload map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &errPayload); err != nil {
+		t.Fatalf("parsing stderr: %v", err)
+	}
+	if errPayload["type"] != "validation_error" {
+		t.Errorf("expected type=validation_error, got %v", errPayload["type"])
+	}
+	msg, _ := errPayload["message"].(string)
+	if !strings.Contains(msg, "--params") {
+		t.Errorf("expected message to mention --params, got %q", msg)
+	}
+}
+
+func TestJSONAndParamFlagsConflict(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	root.SetArgs([]string{
+		"things", "do",
+		"--json", `{"workspace": "prod"}`,
+		"--name", "thing-1",
+	})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not have been called when --json conflicts with flags")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
+	}
+	if result["type"] != "validation_error" {
+		t.Errorf("expected type='validation_error', got %v", result["type"])
+	}
+	msg, _ := result["message"].(string)
+	if !strings.Contains(msg, "--name") || !strings.Contains(msg, "--json") {
+		t.Errorf("expected message to mention --json and --name; got %q", msg)
+	}
+}
+
+func TestFieldsFilterAppliedToOutput(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "list",
+			Description: "List items",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return map[string]any{
+					"data": []any{
+						map[string]any{"id": "1", "name": "alpha", "secret": "drop"},
+						map[string]any{"id": "2", "name": "beta", "secret": "drop"},
+					},
+					"next": "cursor-1",
+				}, nil
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	flags := &stubFlags{format: "json", output: outFile, fields: []string{"data.id", "next"}}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"items", "list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	data, err := os.ReadFile(outFile)
+	if err != nil {
+		t.Fatalf("reading output: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("parsing output: %v (raw: %s)", err, string(data))
+	}
+
+	rows, ok := got["data"].([]any)
+	if !ok || len(rows) != 2 {
+		t.Fatalf("expected 2 rows under 'data', got %v", got["data"])
+	}
+	for i, row := range rows {
+		m, ok := row.(map[string]any)
+		if !ok {
+			t.Fatalf("row %d not a map: %T", i, row)
+		}
+		if _, hasSecret := m["secret"]; hasSecret {
+			t.Errorf("row %d still contains 'secret' after filter: %v", i, m)
+		}
+		if _, hasName := m["name"]; hasName {
+			t.Errorf("row %d still contains 'name' after filter: %v", i, m)
+		}
+		if m["id"] == nil {
+			t.Errorf("row %d missing 'id' after filter", i)
+		}
+	}
+	if got["next"] != "cursor-1" {
+		t.Errorf("expected 'next' kept, got %v", got["next"])
+	}
+}
+
+func TestFieldsFilterDoesNotApplyToErrors(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("items", "Items",
+		Operation{
+			Name:        "fail",
+			Description: "Always fail",
+			Schema:      OperationSchema{Params: map[string]ParamSchema{}},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				return nil, &client.APIError{
+					Type:       "not_found",
+					Message:    "missing",
+					StatusCode: 404,
+				}
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	// fields filter that would, if applied, drop the error fields.
+	flags := &stubFlags{format: "json", fields: []string{"nonexistent"}}
+	Build(root, stubClient(), flags)
+
+	root.SetArgs([]string{"items", "fail"})
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitNotFound {
+		t.Fatalf("expected exit %d, got %d", client.ExitNotFound, *exitCode)
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+
+	var errPayload map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &errPayload); err != nil {
+		t.Fatalf("parsing stderr: %v (raw: %s)", err, buf.String())
+	}
+	if errPayload["type"] != "not_found" {
+		t.Errorf("error payload was filtered or malformed: %v", errPayload)
+	}
+	if errPayload["message"] != "missing" {
+		t.Errorf("error payload missing message field: %v", errPayload)
+	}
+}
+
+func TestParamFlagsMissingRequired(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	_, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+
+	// `workspace` is required but not provided via any mode.
+	root.SetArgs([]string{"things", "do", "--name", "thing-1"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+}
+
+func TestJSONUnknownParamReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do", "--json", `{"workspace":"prod","extra":"bad"}`})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not have been called with unknown params")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
+	}
+
+	fields, ok := result["fields"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected fields map, got %T", result["fields"])
+	}
+	if fields["extra"] != "unknown parameter" {
+		t.Errorf("expected unknown parameter error, got %v", fields["extra"])
+	}
+}
+
+func TestJSONWrongTypeReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	var captured map[string]any
+	registerMixedTypeOp(&captured)
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stderr = w
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do", "--json", `{"workspace":"prod","limit":"42"}`})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	_ = w.Close()
+	os.Stderr = oldStderr
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+	if captured != nil {
+		t.Fatal("Run should not have been called with wrong param types")
+	}
+
+	var buf bytes.Buffer
+	_, _ = buf.ReadFrom(r)
+	var result map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
+		t.Fatalf("parsing error output: %v (raw: %s)", err, buf.String())
+	}
+
+	fields, ok := result["fields"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected fields map, got %T", result["fields"])
+	}
+	if fields["limit"] != "expected integer" {
+		t.Errorf("expected integer type error, got %v", fields["limit"])
+	}
+}
+
+func TestInteractiveHookRequiresAuthByDefault(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	interactiveCalled := false
+	Register(newMockResource("connectors", "Connectors",
+		Operation{
+			Name: "create",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Hooks: OperationHooks{
+				Interactive: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+					interactiveCalled = true
+					return map[string]string{"status": "ok"}, nil
+				},
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	Build(root, nil, &stubFlags{format: "json"})
+	root.SetArgs([]string{"connectors", "create"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	if *exitCode != client.ExitAuth {
+		t.Fatalf("expected exit code %d, got %d", client.ExitAuth, *exitCode)
+	}
+	if interactiveCalled {
+		t.Fatal("Interactive should not be called without credentials by default")
+	}
+}
+
+func TestInteractiveHookCanAllowUnauthenticated(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	interactiveCalled := false
+	Register(newMockResource("auth", "Auth",
+		Operation{
+			Name: "login",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{},
+			},
+			Hooks: OperationHooks{
+				Interactive: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+					interactiveCalled = true
+					return map[string]string{"status": "ok"}, nil
+				},
+				AllowUnauthenticated: true,
+			},
+		},
+	))
+
+	outFile := filepath.Join(t.TempDir(), "out.json")
+	root := newTestRoot()
+	Build(root, nil, &stubFlags{format: "json", output: outFile})
+	root.SetArgs([]string{"auth", "login"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !interactiveCalled {
+		t.Fatal("Interactive should be called when unauthenticated access is allowed")
+	}
+}
+
+func TestParamFlagCollisionReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name: "do",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"json": {Type: "string", Required: false, Description: "Reserved"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				t.Fatal("Run should not be called when schema flags conflict")
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
+	}
+}
+
+func TestParamFlagDuplicateNameReturnsValidationError(t *testing.T) {
+	t.Cleanup(func() { Reset() })
+
+	Register(newMockResource("things", "Things",
+		Operation{
+			Name: "do",
+			Schema: OperationSchema{
+				Params: map[string]ParamSchema{
+					"foo_bar": {Type: "string", Required: false, Description: "One"},
+					"foo-bar": {Type: "string", Required: false, Description: "Two"},
+				},
+			},
+			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
+				t.Fatal("Run should not be called when generated flags conflict")
+				return nil, nil
+			},
+		},
+	))
+
+	exitCode, restore := captureExit(t)
+	defer restore()
+
+	root := newTestRoot()
+	Build(root, stubClient(), &stubFlags{format: "json"})
+	root.SetArgs([]string{"things", "do"})
+
+	func() {
+		defer func() { _ = recover() }()
+		_ = root.Execute()
+	}()
+
+	if *exitCode != client.ExitValidation {
+		t.Fatalf("expected exit code %d, got %d", client.ExitValidation, *exitCode)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -355,5 +356,67 @@ func TestAPIError_JSONSerializable(t *testing.T) {
 	}
 	if parsed.StatusCode != apiErr.StatusCode {
 		t.Errorf("StatusCode = %d, want %d", parsed.StatusCode, apiErr.StatusCode)
+	}
+}
+
+func TestClient_RejectsExternalPaginationURL(t *testing.T) {
+	creds := &auth.Credentials{ClientID: "id", ClientSecret: "secret"}
+	tm := auth.NewTokenManager("https://api.example.com", "", creds)
+	c := New("https://api.example.com", "", "test", tm)
+
+	_, err := c.GetURL(context.Background(), "https://evil.example.com/api/v1/workspaces?cursor=next")
+	if err == nil {
+		t.Fatal("expected error for external pagination URL")
+	}
+
+	apiErr, ok := err.(*APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Type != "validation_error" {
+		t.Errorf("Type = %q, want validation_error", apiErr.Type)
+	}
+}
+
+func TestClient_RejectsSchemeRelativePaginationURL(t *testing.T) {
+	creds := &auth.Credentials{ClientID: "id", ClientSecret: "secret"}
+	tm := auth.NewTokenManager("https://api.example.com", "", creds)
+	c := New("https://api.example.com", "", "test", tm)
+
+	_, err := c.GetURL(context.Background(), "//evil.example.com/api/v1/workspaces?cursor=next")
+	if err == nil {
+		t.Fatal("expected error for scheme-relative external pagination URL")
+	}
+
+	apiErr, ok := err.(*APIError)
+	if !ok {
+		t.Fatalf("expected *APIError, got %T", err)
+	}
+	if apiErr.Type != "validation_error" {
+		t.Errorf("Type = %q, want validation_error", apiErr.Type)
+	}
+}
+
+func TestClient_DebugFuncIsEvaluatedAtRequestTime(t *testing.T) {
+	debug := false
+	c := New("https://api.example.com", "", "test", nil, WithDebugFunc(func() bool { return debug }))
+
+	if c.isDebug() {
+		t.Fatal("debug should initially be false")
+	}
+
+	debug = true
+	if !c.isDebug() {
+		t.Fatal("debug should reflect updated flag state")
+	}
+}
+
+func TestRedactURL(t *testing.T) {
+	got := redactURL("https://api.example.com/path?token=secret&client_secret=hidden&safe=value")
+	if strings.Contains(got, "token=secret") || strings.Contains(got, "client_secret=hidden") {
+		t.Fatalf("expected sensitive query values to be redacted, got %s", got)
+	}
+	if !strings.Contains(got, "safe=value") {
+		t.Fatalf("expected non-sensitive query value to remain, got %s", got)
 	}
 }
