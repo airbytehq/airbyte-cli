@@ -68,7 +68,7 @@ func filter(value any, paths []string) any {
 		if !anyMatch {
 			arrayKeys := []string{}
 			for key, val := range v {
-				if _, isArr := val.([]any); isArr {
+				if isJSONArray(val) {
 					arrayKeys = append(arrayKeys, key)
 				}
 			}
@@ -98,10 +98,35 @@ func filter(value any, paths []string) any {
 			out[i] = filter(item, paths)
 		}
 		return out
+	case []json.RawMessage:
+		// Array of unparsed JSON values — operations that page through API
+		// responses without fully decoding each row hand back this shape
+		// (e.g. workspaces list). Decode each element on the fly so the
+		// filter logic doesn't need to know about late-bound JSON.
+		out := make([]any, len(v))
+		for i, item := range v {
+			var decoded any
+			if err := json.Unmarshal(item, &decoded); err != nil {
+				out[i] = item
+				continue
+			}
+			out[i] = filter(decoded, paths)
+		}
+		return out
 	default:
 		// Primitive — nothing to filter.
 		return v
 	}
+}
+
+// isJSONArray reports whether v is one of the array shapes the filter knows
+// how to broadcast through.
+func isJSONArray(v any) bool {
+	switch v.(type) {
+	case []any, []json.RawMessage:
+		return true
+	}
+	return false
 }
 
 // groupPaths splits each path on its first "." and returns a map of head
