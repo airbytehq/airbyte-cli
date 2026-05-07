@@ -213,6 +213,47 @@ func TestFilter_FallbackSkippedWhenNoArray(t *testing.T) {
 	}
 }
 
+func TestFilter_BroadcastsThroughRawMessageArray(t *testing.T) {
+	// Mirror what `workspaces list` returns: a map whose `data` value is
+	// []json.RawMessage (paginated and accumulated without decoding each row).
+	// `--fields id,name` should auto-broadcast through the wrapper despite
+	// the array elements being late-bound JSON.
+	in := map[string]any{
+		"data": []json.RawMessage{
+			json.RawMessage(`{"id": "ws-1", "name": "Production", "extra": "drop"}`),
+			json.RawMessage(`{"id": "ws-2", "name": "Staging", "extra": "drop"}`),
+		},
+	}
+	got := Filter(in, []string{"id", "name"})
+	want := map[string]any{
+		"data": []any{
+			map[string]any{"id": "ws-1", "name": "Production"},
+			map[string]any{"id": "ws-2", "name": "Staging"},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
+func TestFilter_RawMessageArrayWithExplicitDottedPaths(t *testing.T) {
+	// Same shape, but the user passed long-form paths. Should also work.
+	in := map[string]any{
+		"data": []json.RawMessage{
+			json.RawMessage(`{"id": "ws-1", "name": "Production"}`),
+		},
+		"next": "cursor-1",
+	}
+	got := Filter(in, []string{"data.id", "next"})
+	want := map[string]any{
+		"data": []any{map[string]any{"id": "ws-1"}},
+		"next": "cursor-1",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}
+
 func TestFilter_BareWinsOverNested(t *testing.T) {
 	// If both "data" and "data.id" are requested, the bare path wins —
 	// the caller asked for everything under `data`.
