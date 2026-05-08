@@ -1,7 +1,7 @@
 ---
 name: schema
 description: Print the merged CLI + OpenAPI schema (request, response, parameters) for any operation.
-command: airbyte schema
+command: airbyte-agents schema
 ---
 
 # schema
@@ -9,17 +9,17 @@ command: airbyte schema
 Return the full machine-readable schema for an operation: the CLI-level parameter shape **and** the underlying OpenAPI route's parameters, request body, and response. Equivalent to `<resource> <operation> --describe`, but discoverable as a top-level command.
 
 > [!IMPORTANT]
-> Run `airbyte schema <resource> <operation>` **before** writing code or scripts that consume an operation's output. The `api.response` schema tells you exactly what fields will come back so you can pass `--fields` correctly the first time.
+> Run `airbyte-agents schema <resource> <operation>` **before** writing code or scripts that consume an operation's output. The `api.response` schema tells you exactly what fields will come back so you can pass `--fields` correctly the first time.
 
 ## Usage
 
 ```
-airbyte schema <resource> <operation>
+airbyte-agents schema <resource> <operation>
 
 # Examples
-airbyte schema workspaces list
-airbyte schema connectors execute
-airbyte schema organizations list
+airbyte-agents schema workspaces list
+airbyte-agents schema connectors execute
+airbyte-agents schema organizations list
 ```
 
 ## Output shape
@@ -49,20 +49,20 @@ The two surfaces are intentionally separate:
 
 - **Before building any automation** that depends on an operation's response shape — read `api.response` so you can shape your filtering/parsing precisely.
 - **When `--fields` returns something unexpected** — `api.response` shows the exact field names and structure.
-- **When discovering the API surface** as an agent — `airbyte schema <r> <op>` is the canonical way to learn what an operation does without making a request.
+- **When discovering the API surface** as an agent — `airbyte-agents schema <r> <op>` is the canonical way to learn what an operation does without making a request.
 
 ## Equivalents
 
 ```bash
-airbyte schema connectors execute
+airbyte-agents schema connectors execute
 # is identical to
-airbyte connectors execute --describe
+airbyte-agents connectors execute --describe
 ```
 
-Use whichever fits your flow. `airbyte schema` is the discoverable top-level form; `--describe` is the per-operation flag.
+Use whichever fits your flow. `airbyte-agents schema` is the discoverable top-level form; `--describe` is the per-operation flag.
 
 ## Hints
 
-- `--describe` and `airbyte schema` never make API calls — safe to run without auth, against unfamiliar accounts, etc.
-- Errors from `airbyte schema` (unknown resource or operation) are JSON on stderr with exit code 3.
-- Operations that don't map to an OpenAPI route omit the `api` block. (`airbyte configure` is also purely local but isn't a registered operation — it's a top-level command.)
+- `--describe` and `airbyte-agents schema` never make API calls — safe to run without auth, against unfamiliar accounts, etc.
+- Errors from `airbyte-agents schema` (unknown resource or operation) are JSON on stderr with exit code 3.
+- Operations that don't map to an OpenAPI route omit the `api` block. (`airbyte-agents configure` is also purely local but isn't a registered operation — it's a top-level command.)

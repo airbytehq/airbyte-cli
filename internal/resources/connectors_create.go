@@ -13,9 +13,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/output"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agents-cli/internal/output"
+	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
 )
 
 const (
@@ -204,7 +204,7 @@ func resolveTemplateID(ctx context.Context, c *client.Client, params map[string]
 	if !ok || name == "" {
 		return "", client.NewValidationError(
 			"either 'id' or 'name' is required",
-			"run 'airbyte connectors list-available' to see available templates",
+			"run 'airbyte-agents connectors list-available' to see available templates",
 		)
 	}
 
@@ -226,7 +226,7 @@ func resolveTemplateID(ctx context.Context, c *client.Client, params map[string]
 
 	return "", client.NewNotFoundError(
 		fmt.Sprintf("template %q not found", name),
-		"run 'airbyte connectors list-available' to see available template names",
+		"run 'airbyte-agents connectors list-available' to see available template names",
 	)
 }
 

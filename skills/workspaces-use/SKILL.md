@@ -1,12 +1,12 @@
 ---
 name: workspaces-use
-description: Set the default workspace stored in ~/.airbyte/settings.json. Subsequent commands use this workspace when one isn't explicitly passed.
-command: airbyte workspaces use
+description: Set the default workspace stored in ~/.airbyte-agents/settings.json. Subsequent commands use this workspace when one isn't explicitly passed.
+command: airbyte-agents workspaces use
 ---
 
 # workspaces use
 
-Persist a default workspace name to `~/.airbyte/settings.json`. After running this, any command that takes a `workspace` parameter and doesn't receive one will fall back to this value (in place of the literal `"default"`).
+Persist a default workspace name to `~/.airbyte-agents/settings.json`. After running this, any command that takes a `workspace` parameter and doesn't receive one will fall back to this value (in place of the literal `"default"`).
 
 > [!IMPORTANT]
 > Always pass parameters as `--json '{...}'`. Agents should not use per-parameter flags.
@@ -17,14 +17,14 @@ Persist a default workspace name to `~/.airbyte/settings.json`. After running th
 ## Usage
 
 ```bash
-airbyte workspaces use --json '{"name": "Production"}'
+airbyte-agents workspaces use --json '{"name": "Production"}'
 ```
 
 `name` is required. Match is case-insensitive against the workspace's actual `name` field.
 
 ## When to use
 
-- **Right after `airbyte configure`** — typically the second step in onboarding once you know which workspace you'll be working in.
+- **Right after `airbyte-agents configure`** — typically the second step in onboarding once you know which workspace you'll be working in.
 - **When switching projects** — instead of typing `--json '{"workspace": "..."}'` on every command, set it once.
 - **After creating a new workspace** that should become the default.
 
@@ -34,7 +34,7 @@ airbyte workspaces use --json '{"name": "Production"}'
 {
   "status": "saved",
   "workspace": "Production",
-  "message": "default workspace set to \"Production\" in ~/.airbyte/settings.json"
+  "message": "default workspace set to \"Production\" in ~/.airbyte-agents/settings.json"
 }
 ```
 
@@ -43,9 +43,9 @@ airbyte workspaces use --json '{"name": "Production"}'
 | Error | Cause | Fix |
 |---|---|---|
 | `validation_error` (exit 4) | `name` parameter missing | Pass `--json '{"name": "<workspace>"}'` |
-| `not_found` (exit 3) on workspace | Workspace doesn't exist in this account | Run `airbyte workspaces list --json '{}'` to see real names |
-| `not_found` (exit 3) on settings file | `~/.airbyte/settings.json` missing | Run `airbyte configure` first |
-| `auth_error` (exit 2) | Credentials invalid | Run `airbyte enroll` to verify, then `airbyte configure` if needed |
+| `not_found` (exit 3) on workspace | Workspace doesn't exist in this account | Run `airbyte-agents workspaces list --json '{}'` to see real names |
+| `not_found` (exit 3) on settings file | `~/.airbyte-agents/settings.json` missing | Run `airbyte-agents configure` first |
+| `auth_error` (exit 2) | Credentials invalid | Run `airbyte-agents enroll` to verify, then `airbyte-agents configure` if needed |
 
 ## Hints
 

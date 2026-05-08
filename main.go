@@ -3,12 +3,12 @@ package main
 import (
 	"os"
 
-	"github.com/airbytehq/airbyte-cli/cmd"
-	"github.com/airbytehq/airbyte-cli/internal/auth"
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/config"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
-	"github.com/airbytehq/airbyte-cli/internal/resources"
+	"github.com/airbytehq/airbyte-agents-cli/cmd"
+	"github.com/airbytehq/airbyte-agents-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agents-cli/internal/config"
+	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agents-cli/internal/resources"
 )
 
 func main() {

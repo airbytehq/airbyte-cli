@@ -9,7 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/airbytehq/airbyte-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agents-cli/internal/auth"
 )
 
 func newTestTokenServer(t *testing.T) *httptest.Server {
@@ -61,8 +61,8 @@ func TestClient_Get_AuthHeaders(t *testing.T) {
 	if auth := gotHeaders.Get("Authorization"); auth != "Bearer test-bearer-token" {
 		t.Errorf("Authorization = %q, want %q", auth, "Bearer test-bearer-token")
 	}
-	if ua := gotHeaders.Get("User-Agent"); ua != "airbyte-cli/1.0.0-test" {
-		t.Errorf("User-Agent = %q, want %q", ua, "airbyte-cli/1.0.0-test")
+	if ua := gotHeaders.Get("User-Agent"); ua != "airbyte-agents-cli/1.0.0-test" {
+		t.Errorf("User-Agent = %q, want %q", ua, "airbyte-agents-cli/1.0.0-test")
 	}
 	if org := gotHeaders.Get("X-Organization-Id"); org != "org-123" {
 		t.Errorf("X-Organization-Id = %q, want %q", org, "org-123")

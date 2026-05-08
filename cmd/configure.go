@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/airbytehq/airbyte-cli/internal/auth"
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	outputpkg "github.com/airbytehq/airbyte-cli/internal/output"
+	"github.com/airbytehq/airbyte-agents-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	outputpkg "github.com/airbytehq/airbyte-agents-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ var configureCmd = &cobra.Command{
 	Use:   "configure",
 	Short: "Configure credentials and organization id interactively",
 	Long: `Prompt for client_id, client_secret, organization_id, and a default
-workspace, then save them to ~/.airbyte/settings.json with 0600 permissions.
+workspace, then save them to ~/.airbyte-agents/settings.json with 0600 permissions.
 Run this once on a new machine or whenever your credentials change.
 
 The workspace is used as the fallback for any command that takes a
@@ -59,7 +59,7 @@ The workspace is used as the fallback for any command that takes a
 
 		return outputpkg.WriteJSON(os.Stdout, map[string]string{
 			"status":  "saved",
-			"message": "Settings written to ~/.airbyte/settings.json",
+			"message": "Settings written to ~/.airbyte-agents/settings.json",
 		})
 	},
 }
@@ -67,7 +67,7 @@ The workspace is used as the fallback for any command that takes a
 var configureShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Print the saved settings (with the client secret obfuscated)",
-	Long: `Read ~/.airbyte/settings.json and print its contents as JSON. The
+	Long: `Read ~/.airbyte-agents/settings.json and print its contents as JSON. The
 client_secret is obfuscated — only the trailing characters are visible —
 so the output is safe to paste into a bug report or share for debugging.
 
@@ -83,7 +83,7 @@ shown here when the CLI actually makes API calls.`,
 				outputpkg.WriteError(map[string]any{
 					"type":    "not_found",
 					"message": "settings file does not exist",
-					"hint":    "run 'airbyte configure' to create ~/.airbyte/settings.json",
+					"hint":    "run 'airbyte-agents configure' to create ~/.airbyte-agents/settings.json",
 				})
 				os.Exit(client.ExitNotFound)
 			}

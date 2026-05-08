@@ -1,7 +1,7 @@
 ---
 name: enroll
 description: Verify (and trigger) account enrollment.
-command: airbyte enroll
+command: airbyte-agents enroll
 ---
 
 # enroll
@@ -19,7 +19,7 @@ The first call for a new account *also triggers* enrollment automatically — th
 ## Usage
 
 ```bash
-airbyte enroll
+airbyte-agents enroll
 ```
 
 The command takes no parameters. Returns a JSON document with `is_enrolled` (bool) and `provisioning_state` (one of `null`, `IN_PROGRESS`, `COMPLETED`, `FAILED`), plus organization metadata when enrollment is complete.

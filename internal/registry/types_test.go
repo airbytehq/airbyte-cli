@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
 )
 
 type mockResource struct {

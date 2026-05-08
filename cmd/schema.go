@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	outputpkg "github.com/airbytehq/airbyte-cli/internal/output"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	outputpkg "github.com/airbytehq/airbyte-agents-cli/internal/output"
+	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
 	"github.com/spf13/cobra"
 )
 

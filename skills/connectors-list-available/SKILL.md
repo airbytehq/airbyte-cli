@@ -1,7 +1,7 @@
 ---
 name: connectors-list-available
 description: List connector templates that can be installed via `connectors create`.
-command: airbyte connectors list-available
+command: airbyte-agents connectors list-available
 ---
 
 # connectors list-available
@@ -14,7 +14,7 @@ List the connector templates available to install in this account. Each template
 ## Usage
 
 ```bash
-airbyte connectors list-available --json '{}'
+airbyte-agents connectors list-available --json '{}'
 ```
 
 ## When to use
@@ -24,8 +24,8 @@ Always run this **before** `connectors create` to discover the exact template `n
 ## Workflow
 
 ```bash
-airbyte connectors list-available --json '{}'
-airbyte connectors create --json '{"workspace": "my-workspace", "name": "salesforce"}'
+airbyte-agents connectors list-available --json '{}'
+airbyte-agents connectors create --json '{"workspace": "my-workspace", "name": "salesforce"}'
 ```
 
 ## Filtering output
@@ -36,8 +36,8 @@ airbyte connectors create --json '{"workspace": "my-workspace", "name": "salesfo
 Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
 ```bash
-airbyte connectors list-available --fields id,name --json '{}'              # short form
-airbyte connectors list-available --fields data.id,data.name --json '{}'    # long form
+airbyte-agents connectors list-available --fields id,name --json '{}'              # short form
+airbyte-agents connectors list-available --fields data.id,data.name --json '{}'    # long form
 ```
 
 ## Hints
