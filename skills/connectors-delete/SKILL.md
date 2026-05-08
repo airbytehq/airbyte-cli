@@ -1,7 +1,7 @@
 ---
 name: connectors-delete
 description: Permanently delete a connector from a workspace.
-command: airbyte connectors delete
+command: airbyte-agents connectors delete
 ---
 
 # connectors delete
@@ -17,10 +17,10 @@ Permanently delete a connector from a workspace.
 ## Usage
 
 ```bash
-airbyte connectors delete --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte-agents connectors delete --json '{"workspace": "my-workspace", "name": "my-source"}'
 
 # By connector ID instead of name
-airbyte connectors delete --json '{"id": "<connector-id>"}'
+airbyte-agents connectors delete --json '{"id": "<connector-id>"}'
 ```
 
 `workspace` is optional. If omitted while using `name`, the command falls back to the workspace named `default` and prints a JSON notice on stderr. **Confirm with the user before relying on the fallback for a delete** — operating on the wrong workspace's connector is hard to recover from.

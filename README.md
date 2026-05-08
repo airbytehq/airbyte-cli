@@ -1,8 +1,8 @@
-# airbyte-cli
+# airbyte-agents-cli
 
 A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents.
 
-The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `--describe`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
+The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte-agents <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `--describe`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
 
 ## What it is
 
@@ -18,7 +18,7 @@ See `AGENTS.md` for the full architecture reference and `CONTEXT.md` for the age
 ```
 main.go
   ├── config.Load()              # read env vars (AIRBYTE_API_HOST, etc.)
-  ├── auth.ResolveCredentials()  # env first, then ~/.airbyte/credentials
+  ├── auth.ResolveCredentials()  # env first, then ~/.airbyte-agents/credentials
   ├── auth.NewTokenManager()     # OAuth token caching + auto-refresh
   ├── client.New()               # HTTP client w/ retry + structured errors
   ├── resources.RegisterAll()    # register every Resource into the registry
@@ -47,19 +47,19 @@ The HTTP client retries 429/502/503/504 with backoff and surfaces non-retryable 
 ### Homebrew (macOS, Linux)
 
 ```bash
-brew install airbytehq/tap/airbyte
+brew install airbytehq/tap/airbyte-agents
 ```
 
 ### Manual binary download
 
-Grab the archive for your platform from the [latest release](https://github.com/airbytehq/airbyte-cli/releases/latest), extract it, and put `airbyte` somewhere on your `$PATH`. Builds are published for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted).
+Grab the archive for your platform from the [latest release](https://github.com/airbytehq/airbyte-agents-cli/releases/latest), extract it, and put `airbyte-agents` somewhere on your `$PATH`. Builds are published for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted).
 
 ### Build from source
 
 ```bash
-git clone https://github.com/airbytehq/airbyte-cli.git
-cd airbyte-cli
-make build         # builds ./airbyte
+git clone https://github.com/airbytehq/airbyte-agents-cli.git
+cd airbyte-agents-cli
+make build         # builds ./airbyte-agents
 # or
 make install       # installs to $GOBIN
 ```
@@ -67,20 +67,20 @@ make install       # installs to $GOBIN
 Or directly without the Makefile:
 
 ```bash
-go build -o airbyte .
+go build -o airbyte-agents .
 ```
 
 ## Configure
 
-Settings can be supplied via environment variables or a settings file at `~/.airbyte/settings.json` (JSON, `0600` permissions). Three pieces of information are always required: client ID, client secret, and organization ID.
+Settings can be supplied via environment variables or a settings file at `~/.airbyte-agents/settings.json` (JSON, `0600` permissions). Three pieces of information are always required: client ID, client secret, and organization ID.
 
 ### Resolution order
 
 1. **Environment variables** — used only if **all three** of `AIRBYTE_CLIENT_ID`, `AIRBYTE_CLIENT_SECRET`, and `AIRBYTE_ORGANIZATION_ID` are set. If any is missing, the CLI falls through to the file.
-2. **Settings file** at `~/.airbyte/settings.json`. All three fields must be populated.
+2. **Settings file** at `~/.airbyte-agents/settings.json`. All three fields must be populated.
 3. If neither is configured, the CLI exits with an authentication error.
 
-Env vars take precedence over the file when all three are present, so they're useful for one-off overrides (e.g. `AIRBYTE_ORGANIZATION_ID=... airbyte ...`).
+Env vars take precedence over the file when all three are present, so they're useful for one-off overrides (e.g. `AIRBYTE_ORGANIZATION_ID=... airbyte-agents ...`).
 
 ### Environment variables
 
@@ -96,7 +96,7 @@ Env vars take precedence over the file when all three are present, so they're us
 
 ### Settings file
 
-`~/.airbyte/settings.json`:
+`~/.airbyte-agents/settings.json`:
 
 ```json
 {
@@ -113,12 +113,12 @@ Env vars take precedence over the file when all three are present, so they're us
 
 `workspace` is optional — when absent (or empty), commands that take a `workspace` parameter and don't receive one fall back to the literal `"default"`. Set it once here and you'll never need `--json '{"workspace": "..."}'` for your usual workspace.
 
-Run `airbyte configure` to be prompted for these values and have the file written for you with the right permissions.
+Run `airbyte-agents configure` to be prompted for these values and have the file written for you with the right permissions.
 
 ## Usage
 
 ```bash
-airbyte <resource> <operation> [flags]
+airbyte-agents <resource> <operation> [flags]
 ```
 
 Parameters can be supplied two ways: as a single JSON document via `--json`, or as individual flags (`--workspace foo --name bar`). The two modes are **mutually exclusive** — passing both is an error. Output is JSON by default; `--format table` produces a human-readable table.
@@ -128,18 +128,18 @@ Parameters can be supplied two ways: as a single JSON document via `--json`, or 
 **1. Individual flags (recommended for humans)** — scalar and array parameters in the operation's schema are exposed as `--<param>` flags, with snake_case keys converted to kebab-case (e.g. `select_fields` → `--select-fields`):
 
 ```bash
-airbyte connectors describe --workspace default --name hubspot
-airbyte connectors execute --workspace default --name hubspot \
+airbyte-agents connectors describe --workspace default --name hubspot
+airbyte-agents connectors execute --workspace default --name hubspot \
   --entity contacts --action read \
   --select-fields id,email,name
 ```
 
-Run `airbyte <resource> <operation> --help` to see the available flags for any command.
+Run `airbyte-agents <resource> <operation> --help` to see the available flags for any command.
 
 **2. JSON (recommended for agents and complex payloads)** — pass the whole parameter set as a JSON object:
 
 ```bash
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "workspace": "default",
   "name": "hubspot",
   "entity": "contacts",
@@ -168,12 +168,12 @@ Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the
 ```bash
 # Both of these work — list responses are wrapped in {"data": [...]} and the
 # CLI auto-broadcasts when no path matches a top-level key.
-airbyte organizations list --fields id,organization_name
-airbyte organizations list --fields data.id,data.organization_name
+airbyte-agents organizations list --fields id,organization_name
+airbyte-agents organizations list --fields data.id,data.organization_name
 
 # Mixed paths require explicit prefixes — the auto-broadcast only fires
 # when *no* path matches a top-level key:
-airbyte connectors list --fields data.id,data.name,next
+airbyte-agents connectors list --fields data.id,data.name,next
 ```
 
 **Path resolution rules:**
@@ -188,19 +188,19 @@ This is **client-side**: the full payload still travels from the API to the CLI.
 ### Discovering commands
 
 ```bash
-airbyte --help                              # list resources
-airbyte connectors --help                   # list operations
-airbyte connectors execute --describe       # CLI params + OpenAPI request/response schema
-airbyte schema connectors execute           # equivalent top-level form
+airbyte-agents --help                              # list resources
+airbyte-agents connectors --help                   # list operations
+airbyte-agents connectors execute --describe       # CLI params + OpenAPI request/response schema
+airbyte-agents schema connectors execute           # equivalent top-level form
 ```
 
-`--describe` and `airbyte schema <resource> <operation>` return the same payload: CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
+`--describe` and `airbyte-agents schema <resource> <operation>` return the same payload: CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
 
 ### Command surface
 
 | Command | Description |
 | --- | --- |
-| `configure` | Save credentials + organization id to `~/.airbyte/settings.json` |
+| `configure` | Save credentials + organization id to `~/.airbyte-agents/settings.json` |
 | `enroll` | Check (and trigger) account enrollment & provisioning |
 | `schema <resource> <op>` | Print the merged CLI + OpenAPI schema for an operation |
 | `organizations list` | List organizations |
@@ -216,16 +216,16 @@ airbyte schema connectors execute           # equivalent top-level form
 
 ```bash
 # Verify (and if necessary trigger) enrollment
-airbyte enroll
+airbyte-agents enroll
 
 # Find a workspace
-airbyte workspaces list --json '{}'
+airbyte-agents workspaces list --json '{}'
 
 # Discover what a connector can do
-airbyte connectors describe --json '{"workspace": "default", "name": "hubspot"}'
+airbyte-agents connectors describe --json '{"workspace": "default", "name": "hubspot"}'
 
 # Read data, limiting fields to keep the response small
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "workspace": "default",
   "name": "hubspot",
   "entity": "contacts",
@@ -234,13 +234,13 @@ airbyte connectors execute --json '{
 }'
 
 # Create a new connector (opens a browser for secure credential entry)
-airbyte connectors create --json '{
+airbyte-agents connectors create --json '{
   "workspace": "default",
   "name": "hubspot"
 }'
 
 # Load a complex payload from a file
-airbyte connectors execute --json @params.json
+airbyte-agents connectors execute --json @params.json
 ```
 
 ## Credentials are entered in the browser, not the CLI
@@ -281,7 +281,7 @@ To add a new resource: implement the `Resource` interface in `internal/resources
 
 ## Releases
 
-Releases are cut by pushing a `v*` tag. The `release` workflow builds binaries for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted) via [goreleaser](https://goreleaser.com), uploads them as a draft GitHub release, and commits an updated `Formula/airbyte.rb` to [airbytehq/homebrew-tap](https://github.com/airbytehq/homebrew-tap).
+Releases are cut by pushing a `v*` tag. The `release` workflow builds binaries for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted) via [goreleaser](https://goreleaser.com), uploads them as a draft GitHub release, and commits an updated `Formula/airbyte-agents.rb` to [airbytehq/homebrew-tap](https://github.com/airbytehq/homebrew-tap).
 
 ### Versioning
 
@@ -307,14 +307,14 @@ Pre-releases use a suffix (`v0.2.0-rc1`, `v0.2.0-beta`); goreleaser publishes th
 
 3. **Watch the release workflow.** It runs in two halves:
    - Builds + uploads a **draft** GitHub release (binaries, archives, `checksums.txt`).
-   - Commits `Formula/airbyte.rb` to `airbytehq/homebrew-tap@main`.
+   - Commits `Formula/airbyte-agents.rb` to `airbytehq/homebrew-tap@main`.
 4. **Review the draft release.** Open it in the GitHub UI, check the auto-generated changelog, and either edit the notes or accept them.
 5. **Click Publish.** This is intentional manual gating — easy to catch a misconfigured formula or stale changelog before users see it.
 6. **Smoke-test the install** on a fresh machine:
 
    ```bash
-   brew install airbytehq/tap/airbyte
-   airbyte version
+   brew install airbytehq/tap/airbyte-agents
+   airbyte-agents version
    ```
 
 ### Dry-run before tagging
@@ -324,7 +324,7 @@ Validate the release pipeline locally without pushing anything:
 ```bash
 goreleaser check                    # validates .goreleaser.yaml
 goreleaser release --snapshot --clean
-# inspect dist/ — binaries, archives, and dist/homebrew/Formula/airbyte.rb
+# inspect dist/ — binaries, archives, and dist/homebrew/Formula/airbyte-agents.rb
 ```
 
 The snapshot run produces real artifacts in `dist/` so you can confirm the formula renders correctly and the version-stamped ldflags resolve as expected. Nothing is uploaded.
@@ -333,7 +333,7 @@ The snapshot run produces real artifacts in `dist/` so you can confirm the formu
 
 - **Bad binaries, formula not yet committed.** Delete the draft release in the GitHub UI, delete the tag locally and remotely (`git tag -d v0.1.0 && git push origin :refs/tags/v0.1.0`), fix, retag.
 - **Formula already committed but binaries broken.** Delete the formula commit on `homebrew-tap` (open a one-line revert PR), then retag a new patch version. Don't re-use the same tag.
-- **Need to yank a published release.** Delete the formula commit on `homebrew-tap`. Existing `brew install`s won't rollback automatically; users with the broken version will keep it until they `brew upgrade airbyte`. Consider a `0.x.y+1` patch release rather than a yank when possible — fewer surprises for users.
+- **Need to yank a published release.** Delete the formula commit on `homebrew-tap`. Existing `brew install`s won't rollback automatically; users with the broken version will keep it until they `brew upgrade airbyte-agents`. Consider a `0.x.y+1` patch release rather than a yank when possible — fewer surprises for users.
 
 ### Required secrets
 
@@ -344,4 +344,4 @@ The workflow expects two secrets in this repo (organization-level is fine):
 | `OCTAVIA_BOT_APP_ID` | GitHub App ID for the bot that pushes the formula commit |
 | `OCTAVIA_BOT_PRIVATE_KEY` | Private key for the same GitHub App |
 
-The App's installation must include both `airbytehq/airbyte-cli` and `airbytehq/homebrew-tap`, with `contents: write` permission on both.
+The App's installation must include both `airbytehq/airbyte-agents-cli` and `airbytehq/homebrew-tap`, with `contents: write` permission on both.

@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/airbytehq/airbyte-cli/internal/auth"
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
-	"github.com/airbytehq/airbyte-cli/internal/spec"
+	"github.com/airbytehq/airbyte-agents-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agents-cli/internal/spec"
 )
 
 func newTestTokenServer(t *testing.T) *httptest.Server {

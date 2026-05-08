@@ -1,7 +1,7 @@
 ---
 name: connectors-describe
 description: Inspect a connector's entities and actions. Always run before the first `execute`.
-command: airbyte connectors describe
+command: airbyte-agents connectors describe
 ---
 
 # connectors describe
@@ -17,13 +17,13 @@ Show a connector's available entities (e.g. `users`, `contacts`, `orders`) and t
 ## Usage
 
 ```bash
-airbyte connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte-agents connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
 
 # workspace defaults to "default" when omitted
-airbyte connectors describe --json '{"name": "my-source"}'
+airbyte-agents connectors describe --json '{"name": "my-source"}'
 
 # By connector ID instead of name
-airbyte connectors describe --json '{"id": "<connector-id>"}'
+airbyte-agents connectors describe --json '{"id": "<connector-id>"}'
 ```
 
 `workspace` is optional; if omitted while using `name`, the command falls back to the workspace named `default` and prints a JSON notice on stderr.
@@ -38,13 +38,13 @@ airbyte connectors describe --json '{"id": "<connector-id>"}'
 
 ```bash
 # 1. Find the connector
-airbyte connectors list --json '{"workspace": "my-workspace"}'
+airbyte-agents connectors list --json '{"workspace": "my-workspace"}'
 
 # 2. Describe it
-airbyte connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte-agents connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
 
 # 3. Execute the discovered entity + action
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "users",

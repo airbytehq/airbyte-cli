@@ -13,8 +13,8 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "airbyte",
-	Short: "Airbyte CLI",
+	Use:   "airbyte-agents",
+	Short: "Airbyte Agents CLI",
 	Long:  "Command-line interface for interacting with the Airbyte platform.",
 	Run: func(cmd *cobra.Command, args []string) {
 		_ = cmd.Help()

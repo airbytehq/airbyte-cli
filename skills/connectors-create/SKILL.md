@@ -1,7 +1,7 @@
 ---
 name: connectors-create
 description: Install a new connector via the secure browser-based credential flow.
-command: airbyte connectors create
+command: airbyte-agents connectors create
 ---
 
 # connectors create
@@ -20,16 +20,16 @@ Install a new connector from a template. Opens the user's browser for secure cre
 ## Usage
 
 ```bash
-airbyte connectors create --json '{
+airbyte-agents connectors create --json '{
   "workspace": "my-workspace",
   "name": "salesforce"
 }'
 
 # workspace defaults to "default" when omitted
-airbyte connectors create --json '{"name": "salesforce"}'
+airbyte-agents connectors create --json '{"name": "salesforce"}'
 
 # Bypass name lookup with a template UUID
-airbyte connectors create --json '{"id": "<template-uuid>"}'
+airbyte-agents connectors create --json '{"id": "<template-uuid>"}'
 ```
 
 Either `name` (template name, looked up via `connectors list-available`) or `id` (template UUID) is required. `workspace` is optional and defaults to `default` when omitted; a JSON notice is printed on stderr when the fallback engages.
@@ -38,10 +38,10 @@ Either `name` (template name, looked up via `connectors list-available`) or `id`
 
 ```bash
 # 1. Find a template
-airbyte connectors list-available --json '{}'
+airbyte-agents connectors list-available --json '{}'
 
 # 2. Start the flow
-airbyte connectors create --json '{"workspace": "my-workspace", "name": "hubspot"}'
+airbyte-agents connectors create --json '{"workspace": "my-workspace", "name": "hubspot"}'
 
 # CLI prints a URL, opens the browser, and polls.
 # User completes the OAuth/credential widget in the browser.

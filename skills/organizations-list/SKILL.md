@@ -1,7 +1,7 @@
 ---
 name: organizations-list
 description: List organizations the authenticated user belongs to.
-command: airbyte organizations list
+command: airbyte-agents organizations list
 ---
 
 # organizations list
@@ -14,7 +14,7 @@ List the organizations that the authenticated principal has access to.
 ## Usage
 
 ```bash
-airbyte organizations list --json '{}'
+airbyte-agents organizations list --json '{}'
 ```
 
 ## Filtering output
@@ -25,14 +25,14 @@ airbyte organizations list --json '{}'
 Use the global `--fields` flag to trim the response to specific fields. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
 ```bash
-airbyte organizations list --fields id,organization_name --json '{}'              # short form
-airbyte organizations list --fields data.id,data.organization_name --json '{}'    # long form
+airbyte-agents organizations list --fields id,organization_name --json '{}'              # short form
+airbyte-agents organizations list --fields data.id,data.organization_name --json '{}'    # long form
 ```
 
 If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
 
 ```bash
-airbyte organizations list --fields data.id,next --json '{}'
+airbyte-agents organizations list --fields data.id,next --json '{}'
 ```
 
 ## When to use

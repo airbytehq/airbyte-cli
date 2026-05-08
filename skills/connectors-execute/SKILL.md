@@ -1,7 +1,7 @@
 ---
 name: connectors-execute
 description: Run an action (list/get/search/create/update) against an entity on a connector. The workhorse command — read this skill before calling.
-command: airbyte connectors execute
+command: airbyte-agents connectors execute
 ---
 
 # connectors execute
@@ -23,7 +23,7 @@ Run an action against an entity on a connector — the workhorse command for act
 ## Usage
 
 ```bash
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "workspace": "default",
   "name": "hubspot",
   "entity": "contacts",
@@ -53,7 +53,7 @@ Most connectors expose these actions, but the authoritative list for a given con
 Before guessing what to put in the `entity` / `action` / `params` fields, run `connectors describe` against the connector. Its output is the contract — it lists every entity the connector supports, every action valid on each entity, and the param schema each action accepts.
 
 ```bash
-airbyte connectors describe --json '{"workspace": "default", "name": "hubspot"}'
+airbyte-agents connectors describe --json '{"workspace": "default", "name": "hubspot"}'
 ```
 
 What you'll find in the response:
@@ -67,10 +67,10 @@ Workflow when starting work on an unfamiliar connector:
 
 ```bash
 # 1. Discover entities + actions + params
-airbyte connectors describe --json '{"workspace": "default", "name": "<connector>"}'
+airbyte-agents connectors describe --json '{"workspace": "default", "name": "<connector>"}'
 
 # 2. Now compose execute, knowing the contract
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "workspace": "default",
   "name": "<connector>",
   "entity": "<an-entity-from-describe>",
@@ -158,7 +158,7 @@ Example — find deals owned by a user named "Teo":
 
 ```bash
 # 1. Find Teo's id in the users entity
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "name": "hubspot",
   "entity": "users",
   "action": "context_store_search",
@@ -167,7 +167,7 @@ airbyte connectors execute --json '{
 }'
 
 # 2. Use that id as the foreign key on deals
-airbyte connectors execute --json '{
+airbyte-agents connectors execute --json '{
   "name": "hubspot",
   "entity": "deals",
   "action": "context_store_search",
@@ -197,7 +197,7 @@ Two complementary mechanisms — use **both** when you know the fields you need:
 - **`--fields` (CLI-side, global flag)** — shapes the JSON the CLI prints to stdout, after the API responds.
 
 ```bash
-airbyte connectors execute --fields data.id,data.email,meta.has_more --json '{
+airbyte-agents connectors execute --fields data.id,data.email,meta.has_more --json '{
   "workspace": "default",
   "name": "hubspot",
   "entity": "contacts",
@@ -221,7 +221,7 @@ airbyte connectors execute --fields data.id,data.email,meta.has_more --json '{
 | `not_found` (exit 3) on connector | Name not found | Run `connectors list` to see exact names. The CLI matches against connector instance name, template display name, AND template slug, case-insensitively — so any of those works. |
 | `validation_error` (exit 4) on entity/action | Guessed entity name | Run `connectors describe` to enumerate entities. Actions are universal (see table above). |
 | Ambiguous name (exit 4) | Two connectors share a name | Pass `"id": "<uuid>"` in the JSON payload instead of `"name"`. |
-| `auth_error` (exit 2) | Credentials invalid or expired | Re-run `airbyte enroll` to confirm the account is provisioned; if needed, re-run `airbyte configure` to refresh credentials. |
+| `auth_error` (exit 2) | Credentials invalid or expired | Re-run `airbyte-agents enroll` to confirm the account is provisioned; if needed, re-run `airbyte-agents configure` to refresh credentials. |
 | Empty `data: []` from `context_store_search` | Index lag, or filter too narrow | Retry with `"action": "list"` (live source). If still empty, broaden the filter. |
 
 ## Do NOT

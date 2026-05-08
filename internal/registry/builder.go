@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/output"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agents-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -104,7 +104,7 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 			if c == nil && !op.Hooks.AllowUnauthenticated {
 				return handleRunError(&client.APIError{
 					Type:       "auth_error",
-					Message:    "no credentials configured: set AIRBYTE_CLIENT_ID and AIRBYTE_CLIENT_SECRET environment variables, or create ~/.airbyte/credentials",
+					Message:    "no credentials configured: set AIRBYTE_CLIENT_ID and AIRBYTE_CLIENT_SECRET environment variables, or create ~/.airbyte-agents/credentials",
 					StatusCode: 401,
 				})
 			}

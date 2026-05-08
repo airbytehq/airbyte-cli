@@ -3,8 +3,8 @@ package resources
 import (
 	"context"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
 )
 
 type organizationsResource struct{}

@@ -1,7 +1,7 @@
 ---
 name: connectors-list
 description: List connectors configured in a workspace.
-command: airbyte connectors list
+command: airbyte-agents connectors list
 ---
 
 # connectors list
@@ -14,10 +14,10 @@ List the connectors that already exist in a given workspace.
 ## Usage
 
 ```bash
-airbyte connectors list --json '{"workspace": "my-workspace"}'
+airbyte-agents connectors list --json '{"workspace": "my-workspace"}'
 
 # workspace defaults to "default" when omitted
-airbyte connectors list --json '{}'
+airbyte-agents connectors list --json '{}'
 ```
 
 `workspace` is optional. If omitted, the command falls back to the workspace named `default` and prints a JSON notice on stderr — the API call still proceeds. To target a different workspace, set `"workspace": "<name>"` in the JSON payload.
@@ -36,14 +36,14 @@ airbyte connectors list --json '{}'
 Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
 ```bash
-airbyte connectors list --fields id,name --json '{}'              # short form
-airbyte connectors list --fields data.id,data.name --json '{}'    # long form
+airbyte-agents connectors list --fields id,name --json '{}'              # short form
+airbyte-agents connectors list --fields data.id,data.name --json '{}'    # long form
 ```
 
 If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
 
 ```bash
-airbyte connectors list --fields data.id,next --json '{}'
+airbyte-agents connectors list --fields data.id,next --json '{}'
 ```
 
 ## Related commands
