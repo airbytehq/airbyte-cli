@@ -132,6 +132,8 @@ airbyte-agents connectors create --json '{
 airbyte-agents connectors delete --json '{"workspace": "my-workspace", "name": "old-source"}'
 ```
 
+Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` on a TTY. Without a TTY (e.g. piped agent input), the command refuses with a `validation_error` whose hint tells you to set `"allow_destructive": true` in `~/.airbyte-agents/settings.json` (or `AIRBYTE_ALLOW_DESTRUCTIVE=true`). Once that permission is granted, the prompt is skipped.
+
 ### 6. Schema Introspection
 
 Use `--describe` on any command to see its parameter schema before calling it:

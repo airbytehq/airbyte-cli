@@ -21,6 +21,7 @@ func main() {
 		c = client.New(cfg.APIHost, settings.OrganizationID, cmd.Version, tm,
 			client.WithDebugFunc(cmd.GetVerbose),
 			client.WithDefaultWorkspace(settings.Workspace),
+			client.WithAllowDestructive(settings.AllowDestructive),
 		)
 	}
 

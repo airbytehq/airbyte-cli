@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // Credentials are the raw OAuth client credentials used to mint access
@@ -27,6 +28,11 @@ type Settings struct {
 	Credentials    Credentials
 	OrganizationID string
 	Workspace      string
+	// AllowDestructive, when true, lets destructive operations (e.g.
+	// `connectors delete`) run without an interactive confirmation
+	// prompt. Intended as a one-time permission grant for agent harnesses
+	// that cannot answer a prompt.
+	AllowDestructive bool
 }
 
 // ResolveSettings returns the Settings to use for the current invocation.
@@ -57,10 +63,22 @@ func fromEnv() (*Settings, bool) {
 		return nil, false
 	}
 	return &Settings{
-		Credentials:    Credentials{ClientID: id, ClientSecret: secret},
-		OrganizationID: orgID,
-		Workspace:      os.Getenv("AIRBYTE_WORKSPACE"),
+		Credentials:      Credentials{ClientID: id, ClientSecret: secret},
+		OrganizationID:   orgID,
+		Workspace:        os.Getenv("AIRBYTE_WORKSPACE"),
+		AllowDestructive: parseBoolEnv(os.Getenv("AIRBYTE_ALLOW_DESTRUCTIVE")),
 	}, true
+}
+
+// parseBoolEnv treats common truthy strings ("1", "true", "yes", "on",
+// case-insensitive) as true and everything else as false. Used for
+// optional boolean environment variables.
+func parseBoolEnv(s string) bool {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 func fromFile() (*Settings, bool, error) {
@@ -83,6 +101,13 @@ func fromFile() (*Settings, bool, error) {
 	}
 	if len(missing) > 0 {
 		return nil, false, fmt.Errorf("settings file is missing required fields: %s", joinFields(missing))
+	}
+	// Env var wins over the file when set to a non-empty value;
+	// otherwise inherit the file's value (already populated by
+	// ReadSettingsFile). An empty string is treated as "unset" since it
+	// can't express a meaningful boolean.
+	if v := os.Getenv("AIRBYTE_ALLOW_DESTRUCTIVE"); v != "" {
+		s.AllowDestructive = parseBoolEnv(v)
 	}
 	return s, true, nil
 }
