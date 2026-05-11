@@ -27,6 +27,7 @@ type Client struct {
 	apiHost          string
 	organizationID   string
 	defaultWorkspace string
+	allowDestructive bool
 	userAgent        string
 	tokenManager     *auth.TokenManager
 	httpClient       *http.Client
@@ -61,6 +62,25 @@ func WithDefaultWorkspace(name string) Option {
 // none was set.
 func (c *Client) DefaultWorkspace() string {
 	return c.defaultWorkspace
+}
+
+// WithAllowDestructive grants permission for destructive operations (e.g.
+// `connectors delete`) to run without prompting for interactive
+// confirmation. Sourced from `allow_destructive` in settings.json.
+func WithAllowDestructive(allow bool) Option {
+	return func(c *Client) {
+		c.allowDestructive = allow
+	}
+}
+
+// AllowDestructive reports whether destructive operations may skip the
+// interactive confirmation prompt. Safe to call on a nil receiver
+// (returns false).
+func (c *Client) AllowDestructive() bool {
+	if c == nil {
+		return false
+	}
+	return c.allowDestructive
 }
 
 func New(apiHost, organizationID, version string, tm *auth.TokenManager, opts ...Option) *Client {
