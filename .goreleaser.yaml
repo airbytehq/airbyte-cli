@@ -72,7 +72,6 @@ brews:
     repository:
       owner: airbytehq
       name: homebrew-tap
-      branch: bump-airbyte-agents-{{ .Version }}
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
       branch: main
     directory: Formula
