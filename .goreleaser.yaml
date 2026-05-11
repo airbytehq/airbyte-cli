@@ -82,8 +82,8 @@ brews:
           branch: main
     directory: Formula
     homepage: https://github.com/airbytehq/airbyte-agents-cli
-    description: Go CLI for the Airbyte API, designed for both humans and AI agents
-    license: MIT
+    description: CLI for Airbyte Agents, designed for use by both humans and agents
+    license: ELv2
     install: |
       bin.install "airbyte-agents"
     test: |
