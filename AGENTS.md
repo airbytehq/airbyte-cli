@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-`airbyte-agents` is a Go CLI for interacting with the Airbyte API. It uses a registry-based architecture where resources and operations are defined as Go structs and dynamically converted into Cobra commands at startup.
+`airbyte-agent` is a Go CLI for interacting with the Airbyte API. It uses a registry-based architecture where resources and operations are defined as Go structs and dynamically converted into Cobra commands at startup.
 
 > [!IMPORTANT]
 > **Registry Architecture**: Commands are defined as `Resource` + `Operation` structs in `internal/resources/`, NOT as raw Cobra commands in `cmd/`. When adding a new command, implement the `Resource` interface and register it in `register.go`. Do NOT add `cobra.Command` definitions directly.
@@ -80,8 +80,8 @@ The CLI uses a **resource-registry** pattern:
 
 | File | Purpose |
 | --- | --- |
-| `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte-agents/settings.json` |
-| `credentials_file.go` | Read/write `~/.airbyte-agents/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
+| `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte-agent/settings.json` |
+| `credentials_file.go` | Read/write `~/.airbyte-agent/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
 | `token.go` | `TokenManager` -- OAuth token acquisition and caching with auto-refresh |
 
 ## Command Surface
@@ -171,7 +171,7 @@ The HTTP client automatically retries transient failures:
 | `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
 | `AIRBYTE_WORKSPACE` | Default workspace name | `default` |
 
-All three are also stored in the settings file (`~/.airbyte-agents/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file.
+All three are also stored in the settings file (`~/.airbyte-agent/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file.
 
 ### Configuration
 
@@ -182,7 +182,7 @@ All three are also stored in the settings file (`~/.airbyte-agents/settings.json
 | `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `180` |
 | `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skips the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors the `allow_destructive` settings.json key. | `false` |
 
-Settings file at `~/.airbyte-agents/settings.json` (JSON format, 0600 permissions):
+Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions):
 
 ```json
 {
@@ -224,7 +224,7 @@ Skills are plain markdown files at `skills/<command>/SKILL.md`. To add one:
    ---
    name: <resource>-<operation>
    description: <one-line summary used by listing tools>
-   command: airbyte-agents <resource> <operation>
+   command: airbyte-agent <resource> <operation>
    ---
    ```
 3. Follow with task-oriented body content (when to use, usage examples, error recovery, "do NOT" guidance).

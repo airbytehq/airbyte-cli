@@ -6,8 +6,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/airbytehq/airbyte-agents-cli/internal/client"
-	outputpkg "github.com/airbytehq/airbyte-agents-cli/internal/output"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	outputpkg "github.com/airbytehq/airbyte-agent-cli/internal/output"
 	"github.com/spf13/cobra"
 )
 
@@ -39,7 +39,7 @@ Returns a JSON object with 'is_enrolled' (bool) and 'provisioning_state'
 		if apiClient == nil {
 			outputpkg.WriteError(map[string]any{
 				"type":    "auth_error",
-				"message": "no credentials configured: run 'airbyte-agents configure' or set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, and AIRBYTE_ORGANIZATION_ID",
+				"message": "no credentials configured: run 'airbyte-agent configure' or set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, and AIRBYTE_ORGANIZATION_ID",
 			})
 			os.Exit(client.ExitAuth)
 		}

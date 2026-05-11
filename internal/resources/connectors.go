@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/airbytehq/airbyte-agents-cli/internal/client"
-	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
 )
 
 type connectorsResource struct{}
@@ -118,7 +118,7 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 	if !hasID && !hasName {
 		return nil, client.NewValidationError(
 			"either 'name' + 'workspace' or 'id' is required",
-			"run 'airbyte-agents connectors list --json '{\"workspace\": \"...\"}'' to find connector names, or use --id with a connector ID",
+			"run 'airbyte-agent connectors list --json '{\"workspace\": \"...\"}'' to find connector names, or use --id with a connector ID",
 		)
 	}
 
@@ -167,7 +167,7 @@ func resolveConnectorID(ctx context.Context, c *client.Client, params map[string
 	case 0:
 		return nil, client.NewNotFoundError(
 			fmt.Sprintf("connector %q not found in workspace %q", name, workspaceName),
-			fmt.Sprintf("run 'airbyte-agents connectors list --json '{\"workspace\": \"%s\"}'' to see available connectors", workspaceName),
+			fmt.Sprintf("run 'airbyte-agent connectors list --json '{\"workspace\": \"%s\"}'' to see available connectors", workspaceName),
 		)
 	case 1:
 		params["id"] = matches[0]
@@ -191,7 +191,7 @@ const fallbackWorkspaceName = "default"
 var statusWriter io.Writer = os.Stderr
 
 // applyDefaultWorkspace resolves params["workspace"], falling back to the
-// user's configured default (from ~/.airbyte-agents/settings.json, exposed on the
+// user's configured default (from ~/.airbyte-agent/settings.json, exposed on the
 // client) and ultimately to the literal "default" if neither is set. When
 // the fallback engages, a JSON notice is printed to stderr so users can see
 // which workspace was actually used.
@@ -384,7 +384,7 @@ var confirmDestructive = func(prompt string) error {
 	if !isTerminal() {
 		return client.NewValidationError(
 			"destructive action requires confirmation but no TTY is available",
-			"set \"allow_destructive\": true in ~/.airbyte-agents/settings.json (or AIRBYTE_ALLOW_DESTRUCTIVE=true) to allow non-interactive destructive operations",
+			"set \"allow_destructive\": true in ~/.airbyte-agent/settings.json (or AIRBYTE_ALLOW_DESTRUCTIVE=true) to allow non-interactive destructive operations",
 		)
 	}
 

@@ -1,6 +1,6 @@
 package resources
 
-import "github.com/airbytehq/airbyte-agents-cli/internal/registry"
+import "github.com/airbytehq/airbyte-agent-cli/internal/registry"
 
 func RegisterAll() {
 	registry.Register(&organizationsResource{})
