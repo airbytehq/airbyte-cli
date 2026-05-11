@@ -1,4 +1,4 @@
-module github.com/airbytehq/airbyte-agents-cli
+module github.com/airbytehq/airbyte-agent-cli
 
 go 1.22.0
 

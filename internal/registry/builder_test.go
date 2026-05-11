@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 	"github.com/spf13/cobra"
 )
 
@@ -43,7 +43,7 @@ func (s *stubFlags) GetFields() []string {
 
 func newTestRoot() *cobra.Command {
 	root := &cobra.Command{
-		Use:           "airbyte-agents",
+		Use:           "airbyte-agent",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}

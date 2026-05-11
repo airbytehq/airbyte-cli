@@ -1,5 +1,5 @@
 # Binaries
-airbyte-agents
+airbyte-agent
 *.exe
 *.exe~
 *.dll
@@ -38,5 +38,5 @@ Thumbs.db
 .env
 .env.local
 .airbyte/
-.airbyte-agents/
+.airbyte-agent/
 credentials
