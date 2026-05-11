@@ -3,7 +3,7 @@ package registry
 import (
 	"context"
 
-	"github.com/airbytehq/airbyte-agents-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 )
 
 type Resource interface {
@@ -24,7 +24,7 @@ type Operation struct {
 // SpecRef points an Operation at the OpenAPI route that backs it. The
 // extract-schemas generator uses these to emit only the routes actually used
 // by the CLI; the runtime uses them to look up request/response schemas for
-// `--describe` and `airbyte-agents schema`.
+// `--describe` and `airbyte-agent schema`.
 type SpecRef struct {
 	Path   string
 	Method string

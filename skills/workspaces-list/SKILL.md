@@ -1,15 +1,15 @@
 ---
 name: workspaces-list
 description: List and filter workspaces. Workspace names are the primary identifier for connector commands.
-command: airbyte-agents workspaces list
+command: airbyte-agent workspaces list
 ---
 
 # workspaces list
 
 > [!NOTE]
-> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
-List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `airbyte-agents enroll`).
+List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `airbyte-agent enroll`).
 
 > [!IMPORTANT]
 > Always pass parameters as `--json '{...}'` (use `--json '{}'` for an unfiltered list). Agents should not use per-parameter flags.
@@ -23,12 +23,12 @@ List workspaces in the organization. Workspace names are the identifier passed t
 ## Usage
 
 ```bash
-airbyte-agents workspaces list --json '{}'
-airbyte-agents workspaces list --json '{"name_contains": "production"}'
-airbyte-agents workspaces list --json '{"status": "active"}'
+airbyte-agent workspaces list --json '{}'
+airbyte-agent workspaces list --json '{"name_contains": "production"}'
+airbyte-agent workspaces list --json '{"status": "active"}'
 ```
 
-Run `airbyte-agents schema workspaces list` to see the full parameter schema.
+Run `airbyte-agent schema workspaces list` to see the full parameter schema.
 
 ## Filtering output
 
@@ -38,23 +38,23 @@ Run `airbyte-agents schema workspaces list` to see the full parameter schema.
 Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
 
 ```bash
-airbyte-agents workspaces list --fields name,status --json '{}'              # short form
-airbyte-agents workspaces list --fields data.name,data.status --json '{}'    # long form
+airbyte-agent workspaces list --fields name,status --json '{}'              # short form
+airbyte-agent workspaces list --fields data.name,data.status --json '{}'    # long form
 ```
 
 If you mix top-level and row-level paths, use the long form for row-level fields:
 
 ```bash
-airbyte-agents workspaces list --fields data.name,next --json '{}'
+airbyte-agent workspaces list --fields data.name,next --json '{}'
 ```
 
 ## Discovery flow
 
-1. `airbyte-agents workspaces list --json '{}'` — see all workspaces.
+1. `airbyte-agent workspaces list --json '{}'` — see all workspaces.
 2. Note the exact `name` value.
 3. Either:
    - Pass that name into each command: `--json '{"workspace": "<name>"}'`, or
-   - Persist it as the default once: `airbyte-agents workspaces use --json '{"name": "<name>"}'`. Subsequent commands will fall back to this when `workspace` is omitted.
+   - Persist it as the default once: `airbyte-agent workspaces use --json '{"name": "<name>"}'`. Subsequent commands will fall back to this when `workspace` is omitted.
 
 ## Do NOT
 

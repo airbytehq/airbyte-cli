@@ -1,13 +1,13 @@
 ---
 name: enroll
 description: Verify (and trigger) account enrollment.
-command: airbyte-agents enroll
+command: airbyte-agent enroll
 ---
 
 # enroll
 
 > [!NOTE]
-> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
 Check whether the account is enrolled and what its provisioning state is. **Always the first command in any session** — every other command will fail if the account is not provisioned.
 
@@ -22,7 +22,7 @@ The first call for a new account *also triggers* enrollment automatically — th
 ## Usage
 
 ```bash
-airbyte-agents enroll
+airbyte-agent enroll
 ```
 
 The command takes no parameters. Returns a JSON document with `is_enrolled` (bool) and `provisioning_state` (one of `null`, `IN_PROGRESS`, `COMPLETED`, `FAILED`), plus organization metadata when enrollment is complete.

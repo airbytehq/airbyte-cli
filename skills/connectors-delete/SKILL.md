@@ -1,13 +1,13 @@
 ---
 name: connectors-delete
 description: Permanently delete a connector from a workspace.
-command: airbyte-agents connectors delete
+command: airbyte-agent connectors delete
 ---
 
 # connectors delete
 
 > [!NOTE]
-> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
 Permanently delete a connector from a workspace.
 
@@ -20,10 +20,10 @@ Permanently delete a connector from a workspace.
 ## Usage
 
 ```bash
-airbyte-agents connectors delete --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte-agent connectors delete --json '{"workspace": "my-workspace", "name": "my-source"}'
 
 # By connector ID instead of name
-airbyte-agents connectors delete --json '{"id": "<connector-id>"}'
+airbyte-agent connectors delete --json '{"id": "<connector-id>"}'
 ```
 
 `workspace` is optional. If omitted while using `name`, the command falls back to the workspace named `default` and prints a JSON notice on stderr. **Confirm with the user before relying on the fallback for a delete** — operating on the wrong workspace's connector is hard to recover from.
@@ -34,8 +34,8 @@ By default, delete asks `Type 'yes' to confirm:` on stderr and reads from stdin.
 
 Agents driving the CLI typically can't answer the prompt. There are two ways to allow non-interactive deletes:
 
-1. **Per-machine permission (recommended)**: set `"allow_destructive": true` in `~/.airbyte-agents/settings.json`. The user should explicitly grant this — do not silently flip it on.
-2. **Per-invocation env var**: `AIRBYTE_ALLOW_DESTRUCTIVE=true airbyte-agents connectors delete ...`.
+1. **Per-machine permission (recommended)**: set `"allow_destructive": true` in `~/.airbyte-agent/settings.json`. The user should explicitly grant this — do not silently flip it on.
+2. **Per-invocation env var**: `AIRBYTE_ALLOW_DESTRUCTIVE=true airbyte-agent connectors delete ...`.
 
 If neither is set and stdin isn't a TTY, the command refuses with a `validation_error` and a hint pointing at the setting (exit 4).
 

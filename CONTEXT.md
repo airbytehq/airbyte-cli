@@ -1,6 +1,6 @@
 # Airbyte Agents CLI Context
 
-This document tells AI agents how to use the `airbyte-agents` CLI. For development/architecture details, see `AGENTS.md`.
+This document tells AI agents how to use the `airbyte-agent` CLI. For development/architecture details, see `AGENTS.md`.
 
 ## Rules of Engagement
 
@@ -18,15 +18,15 @@ This document tells AI agents how to use the `airbyte-agents` CLI. For developme
 ## Core Syntax
 
 ```bash
-airbyte-agents <resource> <operation> [flags]
+airbyte-agent <resource> <operation> [flags]
 ```
 
 All parameters are passed via `--json '<JSON>'` or `--id '<ID>'`. Output goes to stdout as JSON (default) or table format.
 
 ```bash
-airbyte-agents --help                        # List all resources
-airbyte-agents <resource> --help             # List operations for a resource
-airbyte-agents <resource> <operation> --describe  # Show parameter schema
+airbyte-agent --help                        # List all resources
+airbyte-agent <resource> --help             # List operations for a resource
+airbyte-agent <resource> <operation> --describe  # Show parameter schema
 ```
 
 ### Key Flags
@@ -47,29 +47,29 @@ airbyte-agents <resource> <operation> --describe  # Show parameter schema
 
 ```bash
 # Configure credentials interactively
-airbyte-agents configure
+airbyte-agent configure
 
 # Verify enrollment
-airbyte-agents enroll
+airbyte-agent enroll
 
 # Find your workspace
-airbyte-agents workspaces list --format table
+airbyte-agent workspaces list --format table
 ```
 
 ### 2. Listing and Discovering Connectors
 
 ```bash
 # List connectors in a workspace
-airbyte-agents connectors list --json '{"workspace": "my-workspace"}'
+airbyte-agent connectors list --json '{"workspace": "my-workspace"}'
 
 # List available connector templates (for creating new connectors)
-airbyte-agents connectors list-available --format table
+airbyte-agent connectors list-available --format table
 
 # Describe a connector to see its entities and actions
-airbyte-agents connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte-agent connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
 
 # Or by ID
-airbyte-agents connectors describe --id 'f24fb2b0-c054-48f1-9e0f-cfb62e12f878'
+airbyte-agent connectors describe --id 'f24fb2b0-c054-48f1-9e0f-cfb62e12f878'
 ```
 
 ### 3. Executing Connector Actions
@@ -78,7 +78,7 @@ Always `describe` first to discover available entities and actions.
 
 ```bash
 # Read data from a connector
-airbyte-agents connectors execute --json '{
+airbyte-agent connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "users",
@@ -86,7 +86,7 @@ airbyte-agents connectors execute --json '{
 }'
 
 # With parameters
-airbyte-agents connectors execute --json '{
+airbyte-agent connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "deals",
@@ -95,7 +95,7 @@ airbyte-agents connectors execute --json '{
 }'
 
 # Limit response fields to protect context window
-airbyte-agents connectors execute --json '{
+airbyte-agent connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "contacts",
@@ -104,7 +104,7 @@ airbyte-agents connectors execute --json '{
 }'
 
 # Exclude heavy fields
-airbyte-agents connectors execute --json '{
+airbyte-agent connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "messages",
@@ -117,10 +117,10 @@ airbyte-agents connectors execute --json '{
 
 ```bash
 # Browse available templates
-airbyte-agents connectors list-available --format table
+airbyte-agent connectors list-available --format table
 
 # Create (opens browser for secure credential entry)
-airbyte-agents connectors create --json '{
+airbyte-agent connectors create --json '{
   "workspace": "my-workspace",
   "name": "hubspot"
 }'
@@ -129,17 +129,17 @@ airbyte-agents connectors create --json '{
 ### 5. Deleting a Connector
 
 ```bash
-airbyte-agents connectors delete --json '{"workspace": "my-workspace", "name": "old-source"}'
+airbyte-agent connectors delete --json '{"workspace": "my-workspace", "name": "old-source"}'
 ```
 
-Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` on a TTY. Without a TTY (e.g. piped agent input), the command refuses with a `validation_error` whose hint tells you to set `"allow_destructive": true` in `~/.airbyte-agents/settings.json` (or `AIRBYTE_ALLOW_DESTRUCTIVE=true`). Once that permission is granted, the prompt is skipped.
+Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` on a TTY. Without a TTY (e.g. piped agent input), the command refuses with a `validation_error` whose hint tells you to set `"allow_destructive": true` in `~/.airbyte-agent/settings.json` (or `AIRBYTE_ALLOW_DESTRUCTIVE=true`). Once that permission is granted, the prompt is skipped.
 
 ### 6. Schema Introspection
 
 Use `--describe` on any command to see its parameter schema before calling it:
 
 ```bash
-airbyte-agents connectors execute --describe
+airbyte-agent connectors execute --describe
 # Returns:
 # {
 #   "description": "Execute an action on a connector",
@@ -160,7 +160,7 @@ For complex JSON payloads, use `@filename`:
 
 ```bash
 echo '{"workspace": "my-workspace", "name": "my-source", "entity": "users", "action": "read"}' > params.json
-airbyte-agents connectors execute --json @params.json
+airbyte-agent connectors execute --json @params.json
 ```
 
 ## Error Handling
@@ -182,7 +182,7 @@ Errors include a `hint` field with actionable guidance:
   "error": "not_found",
   "message": "connector \"gong\" not found in workspace \"default\"",
   "status_code": 404,
-  "hint": "run 'airbyte-agents connectors list --json '{\"workspace\": \"default\"}'' to see available connectors"
+  "hint": "run 'airbyte-agent connectors list --json '{\"workspace\": \"default\"}'' to see available connectors"
 }
 ```
 

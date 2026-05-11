@@ -1,13 +1,13 @@
 ---
 name: connectors-create
 description: Install a new connector via the secure browser-based credential flow.
-command: airbyte-agents connectors create
+command: airbyte-agent connectors create
 ---
 
 # connectors create
 
 > [!NOTE]
-> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
 Install a new connector from a template. Opens the user's browser for secure credential entry, polls until credentials are submitted, and creates the connector.
 
@@ -23,16 +23,16 @@ Install a new connector from a template. Opens the user's browser for secure cre
 ## Usage
 
 ```bash
-airbyte-agents connectors create --json '{
+airbyte-agent connectors create --json '{
   "workspace": "my-workspace",
   "name": "salesforce"
 }'
 
 # workspace defaults to "default" when omitted
-airbyte-agents connectors create --json '{"name": "salesforce"}'
+airbyte-agent connectors create --json '{"name": "salesforce"}'
 
 # Bypass name lookup with a template UUID
-airbyte-agents connectors create --json '{"id": "<template-uuid>"}'
+airbyte-agent connectors create --json '{"id": "<template-uuid>"}'
 ```
 
 Either `name` (template name, looked up via `connectors list-available`) or `id` (template UUID) is required. `workspace` is optional and defaults to `default` when omitted; a JSON notice is printed on stderr when the fallback engages.
@@ -41,10 +41,10 @@ Either `name` (template name, looked up via `connectors list-available`) or `id`
 
 ```bash
 # 1. Find a template
-airbyte-agents connectors list-available --json '{}'
+airbyte-agent connectors list-available --json '{}'
 
 # 2. Start the flow
-airbyte-agents connectors create --json '{"workspace": "my-workspace", "name": "hubspot"}'
+airbyte-agent connectors create --json '{"workspace": "my-workspace", "name": "hubspot"}'
 
 # CLI prints a URL, opens the browser, and polls.
 # User completes the OAuth/credential widget in the browser.

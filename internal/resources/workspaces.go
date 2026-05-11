@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/airbytehq/airbyte-agents-cli/internal/auth"
-	"github.com/airbytehq/airbyte-agents-cli/internal/client"
-	"github.com/airbytehq/airbyte-agents-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
 )
 
 type workspacesResource struct{}
@@ -34,7 +34,7 @@ func (w *workspacesResource) Operations() []registry.Operation {
 		},
 		{
 			Name:        "use",
-			Description: "Set the default workspace stored in ~/.airbyte-agents/settings.json",
+			Description: "Set the default workspace stored in ~/.airbyte-agent/settings.json",
 			Schema: registry.OperationSchema{
 				Description: "Update settings.json so subsequent commands that don't pass `workspace` use this name. The workspace must exist (the command verifies via the API before writing).",
 				Params: map[string]registry.ParamSchema{
@@ -46,7 +46,7 @@ func (w *workspacesResource) Operations() []registry.Operation {
 	}
 }
 
-// useWorkspace updates Settings.Workspace in ~/.airbyte-agents/settings.json.
+// useWorkspace updates Settings.Workspace in ~/.airbyte-agent/settings.json.
 // It verifies the workspace exists via the API first, so users can't save a
 // typo'd or nonexistent name. The canonical case from the API response is
 // what gets persisted.
@@ -69,7 +69,7 @@ func useWorkspace(ctx context.Context, c *client.Client, params map[string]any) 
 		if os.IsNotExist(err) {
 			return nil, client.NewNotFoundError(
 				"settings file does not exist",
-				"run 'airbyte-agents configure' first to create ~/.airbyte-agents/settings.json",
+				"run 'airbyte-agent configure' first to create ~/.airbyte-agent/settings.json",
 			)
 		}
 		return nil, fmt.Errorf("reading settings: %w", err)
@@ -83,7 +83,7 @@ func useWorkspace(ctx context.Context, c *client.Client, params map[string]any) 
 	return map[string]any{
 		"status":    "saved",
 		"workspace": canonical,
-		"message":   fmt.Sprintf("default workspace set to %q in ~/.airbyte-agents/settings.json", canonical),
+		"message":   fmt.Sprintf("default workspace set to %q in ~/.airbyte-agent/settings.json", canonical),
 	}, nil
 }
 
@@ -117,7 +117,7 @@ func lookupWorkspaceName(ctx context.Context, c *client.Client, name string) (st
 
 	return "", client.NewNotFoundError(
 		fmt.Sprintf("workspace %q not found", name),
-		"run 'airbyte-agents workspaces list' to see available workspaces",
+		"run 'airbyte-agent workspaces list' to see available workspaces",
 	)
 }
 
