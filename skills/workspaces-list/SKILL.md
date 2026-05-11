@@ -6,6 +6,9 @@ command: airbyte-agents workspaces list
 
 # workspaces list
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `airbyte-agents enroll`).
 
 > [!IMPORTANT]

@@ -267,7 +267,33 @@ When you see a validation error, re-run the command with `--describe` to inspect
 
 ## Skills
 
-Per-command agent skill documents live under `skills/<command>/SKILL.md`, each with YAML frontmatter (`name`, `description`, `command`) and task-oriented guidance. They are designed to be consumed by agent harnesses (e.g. Claude Code) — copy or symlink the directory into the harness's skill location, or distribute via your own tooling.
+Per-command agent skill documents live under `skills/<command>/SKILL.md`, each with YAML frontmatter (`name`, `description`, `command`) and task-oriented guidance. They are designed to be consumed by agent harnesses (e.g. Claude Code).
+
+The skills work alongside the CLI — they tell the agent *how* to invoke each command, while the `airbyte-agents` binary does the actual work. Install the CLI first (see [Install](#install)), then install the skills into your agent.
+
+### Install via `npx skills`
+
+The [`skills`](https://github.com/vercel-labs/skills) installer discovers the `skills/` directory in this repo and wires each `SKILL.md` into your agent (Claude Code, etc.):
+
+```bash
+# Install all skills
+npx skills add airbytehq/airbyte-agents-cli
+
+# Install one skill
+npx skills add airbytehq/airbyte-agents-cli --skill connectors-execute
+
+# Preview without installing
+npx skills add airbytehq/airbyte-agents-cli --list
+
+# Install globally instead of per-project
+npx skills add airbytehq/airbyte-agents-cli -g
+```
+
+Target a specific agent with `--agent claude-code` (or another supported agent). See the [`skills` CLI docs](https://github.com/vercel-labs/skills) for the full flag set.
+
+### Manual install
+
+Copy or symlink `skills/<command>/` into your agent's skill directory directly (e.g. `~/.claude/skills/` for Claude Code).
 
 ## Develop
 
