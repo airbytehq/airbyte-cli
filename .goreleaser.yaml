@@ -63,12 +63,10 @@ release:
   prerelease: auto
   name_template: "v{{ .Version }}"
 
-# Homebrew formula generation. Goreleaser opens a PR against airbytehq/homebrew-tap
-# updating Formula/airbyte-agents.rb on each non-prerelease release. main is
-# branch-protected on the tap, so direct commits 409 — the PR flow is the
-# supported path. Cross-repo write requires a separate token
-# (HOMEBREW_TAP_GITHUB_TOKEN) — the default GITHUB_TOKEN issued by the workflow
-# only has access to this repo.
+# Homebrew formula generation. Goreleaser commits Formula/airbyte-agents.rb to the
+# airbytehq/homebrew-tap repo on each non-prerelease release. Cross-repo write
+# requires a separate token (HOMEBREW_TAP_GITHUB_TOKEN) — the default
+# GITHUB_TOKEN issued by the workflow only has access to this repo.
 brews:
   - name: airbyte-agents
     repository:
@@ -76,10 +74,7 @@ brews:
       name: homebrew-tap
       branch: bump-airbyte-agents-{{ .Version }}
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-      pull_request:
-        enabled: true
-        base:
-          branch: main
+      branch: main
     directory: Formula
     homepage: https://github.com/airbytehq/airbyte-agents-cli
     description: CLI for Airbyte Agents, designed for use by both humans and agents
