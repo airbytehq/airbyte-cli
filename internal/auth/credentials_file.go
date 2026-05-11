@@ -34,6 +34,10 @@ type settingsBody struct {
 	Credentials    credentialsBody `json:"credentials"`
 	OrganizationID string          `json:"organization_id"`
 	Workspace      string          `json:"workspace,omitempty"`
+	// AllowDestructive bypasses the interactive confirmation prompt on
+	// destructive commands. Stored in the file so agent harnesses (which
+	// can't answer a prompt) can be granted this permission once.
+	AllowDestructive bool `json:"allow_destructive,omitempty"`
 }
 
 type credentialsBody struct {
@@ -73,8 +77,9 @@ func ReadSettingsFile() (*Settings, error) {
 			ClientID:     sf.Settings.Credentials.ClientID,
 			ClientSecret: sf.Settings.Credentials.ClientSecret,
 		},
-		OrganizationID: sf.Settings.OrganizationID,
-		Workspace:      sf.Settings.Workspace,
+		OrganizationID:   sf.Settings.OrganizationID,
+		Workspace:        sf.Settings.Workspace,
+		AllowDestructive: sf.Settings.AllowDestructive,
 	}, nil
 }
 
@@ -97,8 +102,9 @@ func WriteSettingsFile(s *Settings) error {
 				ClientID:     s.Credentials.ClientID,
 				ClientSecret: s.Credentials.ClientSecret,
 			},
-			OrganizationID: s.OrganizationID,
-			Workspace:      s.Workspace,
+			OrganizationID:   s.OrganizationID,
+			Workspace:        s.Workspace,
+			AllowDestructive: s.AllowDestructive,
 		},
 	}
 	content, err := json.MarshalIndent(sf, "", "  ")

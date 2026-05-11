@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/airbytehq/airbyte-agents-cli/internal/auth"
 	"github.com/airbytehq/airbyte-agents-cli/internal/client"
 )
 
@@ -502,6 +504,11 @@ func TestConnectorsDelete(t *testing.T) {
 	c, cleanup := newTestClient(t, apiServer)
 	defer cleanup()
 
+	// The HTTP wiring is what this test exercises — bypass the prompt so
+	// the test stays focused. Confirmation flow has its own coverage
+	// below.
+	withAutoConfirm(t)
+
 	_, err := connectorsDelete(context.Background(), c, map[string]any{"id": "conn-1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -512,6 +519,166 @@ func TestConnectorsDelete(t *testing.T) {
 	}
 	if gotPath != "/api/v1/integrations/connectors/conn-1" {
 		t.Errorf("expected path /api/v1/integrations/connectors/conn-1, got %s", gotPath)
+	}
+}
+
+// withAutoConfirm replaces the confirmation hook with a no-op for the
+// duration of the test. Restores the original on cleanup.
+func withAutoConfirm(t *testing.T) {
+	t.Helper()
+	prev := confirmDestructive
+	confirmDestructive = func(string) error { return nil }
+	t.Cleanup(func() { confirmDestructive = prev })
+}
+
+func TestConnectorsDelete_AllowDestructiveSkipsPrompt(t *testing.T) {
+	called := false
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer apiServer.Close()
+
+	tokenServer := newTestTokenServer(t)
+	defer tokenServer.Close()
+	creds := &auth.Credentials{ClientID: "id", ClientSecret: "secret"}
+	tm := auth.NewTokenManager(tokenServer.URL, "", creds)
+	c := client.New(apiServer.URL, "org", "test", tm, client.WithAllowDestructive(true))
+
+	prev := confirmDestructive
+	confirmDestructive = func(string) error {
+		called = true
+		return fmt.Errorf("should not be called")
+	}
+	defer func() { confirmDestructive = prev }()
+
+	_, err := connectorsDelete(context.Background(), c, map[string]any{"id": "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if called {
+		t.Error("confirmDestructive was invoked despite AllowDestructive=true")
+	}
+}
+
+func TestConnectorsDelete_ConfirmationDeclinedBlocksRequest(t *testing.T) {
+	var requestCount int
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	prev := confirmDestructive
+	confirmDestructive = func(string) error {
+		return client.NewValidationError("destructive action cancelled by user", "")
+	}
+	defer func() { confirmDestructive = prev }()
+
+	_, err := connectorsDelete(context.Background(), c, map[string]any{"id": "conn-1"})
+	if err == nil {
+		t.Fatal("expected error when user declines, got nil")
+	}
+	if requestCount != 0 {
+		t.Errorf("DELETE was sent despite cancellation (requestCount=%d)", requestCount)
+	}
+}
+
+func TestConfirmDestructive_NonTTYErrors(t *testing.T) {
+	// Force the TTY check to report "not a TTY" — simulates piped input,
+	// which is the path agent harnesses hit.
+	prev := isTerminal
+	isTerminal = func() bool { return false }
+	defer func() { isTerminal = prev }()
+
+	err := confirmDestructive("Delete connector x?")
+	if err == nil {
+		t.Fatal("expected error in non-TTY environment, got nil")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 400 {
+		t.Errorf("expected 400 validation error, got %d", apiErr.StatusCode)
+	}
+	if !strings.Contains(apiErr.Hint, "allow_destructive") {
+		t.Errorf("hint should point users at the setting; got %q", apiErr.Hint)
+	}
+}
+
+func TestConfirmDestructive_TTYAcceptsYes(t *testing.T) {
+	prevTTY := isTerminal
+	prevReader := confirmReader
+	prevWriter := confirmWriter
+	isTerminal = func() bool { return true }
+	confirmReader = strings.NewReader("yes\n")
+	confirmWriter = &bytes.Buffer{}
+	defer func() {
+		isTerminal = prevTTY
+		confirmReader = prevReader
+		confirmWriter = prevWriter
+	}()
+
+	if err := confirmDestructive("Delete?"); err != nil {
+		t.Fatalf("expected nil on 'yes', got %v", err)
+	}
+}
+
+func TestConfirmDestructive_TTYRejectsNonYes(t *testing.T) {
+	cases := []string{"", "y", "no", "YES NO", "yeah"}
+	for _, input := range cases {
+		t.Run(input, func(t *testing.T) {
+			prevTTY := isTerminal
+			prevReader := confirmReader
+			prevWriter := confirmWriter
+			isTerminal = func() bool { return true }
+			confirmReader = strings.NewReader(input + "\n")
+			confirmWriter = &bytes.Buffer{}
+			defer func() {
+				isTerminal = prevTTY
+				confirmReader = prevReader
+				confirmWriter = prevWriter
+			}()
+
+			if err := confirmDestructive("Delete?"); err == nil {
+				t.Errorf("input %q should be rejected", input)
+			}
+		})
+	}
+}
+
+func TestDeletePromptFor(t *testing.T) {
+	cases := []struct {
+		name   string
+		params map[string]any
+		want   string
+	}{
+		{
+			name:   "id only",
+			params: map[string]any{"id": "conn-1"},
+			want:   "Delete connector with id conn-1?",
+		},
+		{
+			name:   "name + workspace",
+			params: map[string]any{"id": "conn-1", "name": "stripe", "workspace": "prod"},
+			want:   `Delete connector "stripe" (id conn-1) from workspace "prod"?`,
+		},
+		{
+			name:   "name only",
+			params: map[string]any{"id": "conn-1", "name": "stripe"},
+			want:   `Delete connector "stripe" (id conn-1)?`,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := deletePromptFor(tc.params)
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
