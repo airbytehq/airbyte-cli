@@ -6,6 +6,9 @@ command: airbyte-agents connectors execute
 
 # connectors execute
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 Run an action against an entity on a connector — the workhorse command for actually moving data. This skill embeds the SDK-level knowledge of how the underlying API behaves (filter operators, pagination, response shape, field-selection rules). For *connector-specific* details — which entities exist, which actions they support, and which params they take — call `connectors describe` first; never guess.
 
 > [!IMPORTANT]

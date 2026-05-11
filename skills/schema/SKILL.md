@@ -6,6 +6,9 @@ command: airbyte-agents schema
 
 # schema
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 Return the full machine-readable schema for an operation: the CLI-level parameter shape **and** the underlying OpenAPI route's parameters, request body, and response. Equivalent to `<resource> <operation> --describe`, but discoverable as a top-level command.
 
 > [!IMPORTANT]

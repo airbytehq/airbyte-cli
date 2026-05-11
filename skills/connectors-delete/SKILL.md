@@ -6,6 +6,9 @@ command: airbyte-agents connectors delete
 
 # connectors delete
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 Permanently delete a connector from a workspace.
 
 > [!IMPORTANT]
