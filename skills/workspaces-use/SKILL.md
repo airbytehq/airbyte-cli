@@ -6,6 +6,9 @@ command: airbyte-agents workspaces use
 
 # workspaces use
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 Persist a default workspace name to `~/.airbyte-agents/settings.json`. After running this, any command that takes a `workspace` parameter and doesn't receive one will fall back to this value (in place of the literal `"default"`).
 
 > [!IMPORTANT]

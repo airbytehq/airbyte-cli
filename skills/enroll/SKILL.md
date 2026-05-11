@@ -6,6 +6,9 @@ command: airbyte-agents enroll
 
 # enroll
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 Check whether the account is enrolled and what its provisioning state is. **Always the first command in any session** — every other command will fail if the account is not provisioned.
 
 The first call for a new account *also triggers* enrollment automatically — this is why the command is named `enroll` rather than `enrollment status`. Polling the same command moves the account through provisioning to completion.

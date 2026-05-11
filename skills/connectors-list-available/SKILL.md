@@ -6,6 +6,9 @@ command: airbyte-agents connectors list-available
 
 # connectors list-available
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 List the connector templates available to install in this account. Each template has a `name` (e.g. `salesforce`, `hubspot`) that you pass to `connectors create --json '{"name": "<name>"}'`.
 
 > [!IMPORTANT]
