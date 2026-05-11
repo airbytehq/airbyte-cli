@@ -6,6 +6,9 @@ command: airbyte-agents connectors create
 
 # connectors create
 
+> [!NOTE]
+> Requires the `airbyte-agents` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agents` or see the [project README](https://github.com/airbytehq/airbyte-agents-cli#install).
+
 Install a new connector from a template. Opens the user's browser for secure credential entry, polls until credentials are submitted, and creates the connector.
 
 > [!IMPORTANT]
