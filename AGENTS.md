@@ -180,6 +180,7 @@ All three are also stored in the settings file (`~/.airbyte-agents/settings.json
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
 | `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
 | `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `180` |
+| `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skips the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors the `allow_destructive` settings.json key. | `false` |
 
 Settings file at `~/.airbyte-agents/settings.json` (JSON format, 0600 permissions):
 
@@ -191,12 +192,15 @@ Settings file at `~/.airbyte-agents/settings.json` (JSON format, 0600 permission
       "client_secret": "your-client-secret"
     },
     "organization_id": "your-org-id",
-    "workspace": "default"
+    "workspace": "default",
+    "allow_destructive": false
   }
 }
 ```
 
 `workspace` is optional. When absent or empty, commands that take a `workspace` parameter without receiving one fall back to the literal `"default"`. Resources read the configured value via `client.Client.DefaultWorkspace()`, which `main.go` populates from `Settings.Workspace`.
+
+`allow_destructive` is optional (default `false`). When `true`, destructive operations (currently `connectors delete`) skip the interactive `"Type 'yes' to confirm:"` prompt. Intended as a one-time permission grant for agent harnesses that can't answer a TTY prompt. The non-interactive default refuses with a clear `validation_error` rather than hanging on stdin. Resources read this via `client.Client.AllowDestructive()`.
 
 ## Adding New Resources
 

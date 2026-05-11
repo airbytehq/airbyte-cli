@@ -191,6 +191,89 @@ func TestSettingsFile_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestSettingsFile_RoundTripsAllowDestructive(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_ALLOW_DESTRUCTIVE", "")
+
+	original := &Settings{
+		Credentials:      Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID:   "org",
+		AllowDestructive: true,
+	}
+	if err := WriteSettingsFile(original); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+
+	loaded, err := ReadSettingsFile()
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	if !loaded.AllowDestructive {
+		t.Error("AllowDestructive did not survive round-trip")
+	}
+
+	// Resolved settings should also reflect the file value when env
+	// doesn't override.
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+	resolved, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if !resolved.AllowDestructive {
+		t.Error("ResolveSettings did not propagate AllowDestructive from file")
+	}
+}
+
+func TestSettingsFile_AllowDestructiveDefaultsFalseWhenAbsent(t *testing.T) {
+	// File has no allow_destructive key → field is false.
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_ALLOW_DESTRUCTIVE", "")
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+
+	writeSettings(t, tmpDir, validSettingsJSON)
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if s.AllowDestructive {
+		t.Error("AllowDestructive defaulted to true; expected false when key is absent")
+	}
+}
+
+func TestResolveSettings_EnvAllowDestructiveOverridesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	// File explicitly enables it; env explicitly disables. Env should
+	// win.
+	if err := WriteSettingsFile(&Settings{
+		Credentials:      Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID:   "org",
+		AllowDestructive: true,
+	}); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+	t.Setenv("AIRBYTE_ALLOW_DESTRUCTIVE", "false")
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if s.AllowDestructive {
+		t.Error("env AIRBYTE_ALLOW_DESTRUCTIVE=false did not override file value")
+	}
+}
+
 func TestSettingsFile_PreservesNestedStructure(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
