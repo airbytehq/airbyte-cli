@@ -9,12 +9,14 @@ import (
 	"github.com/airbytehq/airbyte-agent-cli/internal/config"
 	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
 	"github.com/airbytehq/airbyte-agent-cli/internal/resources"
+	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
 )
 
 func main() {
 	cfg := config.Load()
 
 	var c *client.Client
+	var t *telemetry.Tracker
 	if settings, err := auth.ResolveSettings(); err == nil {
 		creds := settings.Credentials
 		tm := auth.NewTokenManager(cfg.APIHost, settings.OrganizationID, &creds)
@@ -23,13 +25,23 @@ func main() {
 			client.WithDefaultWorkspace(settings.Workspace),
 			client.WithAllowDestructive(settings.AllowDestructive),
 		)
+		t = telemetry.New(
+			telemetry.ResolveMode(settings.TelemetryEnabled),
+			settings.OrganizationID,
+			cmd.Version,
+			settings.IsInternalUser,
+		)
 	}
 
 	cmd.SetAPIClient(c)
+	cmd.SetTracker(t)
+	registry.SetTracker(t)
 	resources.RegisterAll()
 	registry.Build(cmd.GetRootCmd(), c, cmd.FlagAccessor())
 
-	if err := cmd.Execute(); err != nil {
+	err := cmd.Execute()
+	t.Flush()
+	if err != nil {
 		os.Exit(1)
 	}
 }

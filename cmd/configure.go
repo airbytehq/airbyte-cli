@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
 	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 	outputpkg "github.com/airbytehq/airbyte-agent-cli/internal/output"
+	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -25,6 +27,7 @@ The workspace is used as the fallback for any command that takes a
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		start := time.Now()
 		reader := bufio.NewReader(os.Stdin)
 
 		clientID, err := promptRequired(reader, "Client ID")
@@ -44,18 +47,44 @@ The workspace is used as the fallback for any command that takes a
 			return err
 		}
 
+		// Preserve telemetry / internal-user values from any prior
+		// settings file so re-running configure doesn't reset what the
+		// user previously set. Missing file → use the documented
+		// defaults (telemetry on, internal off).
+		telemetryEnabled := true
+		isInternalUser := false
+		if existing, rerr := auth.ReadSettingsFile(); rerr == nil {
+			telemetryEnabled = existing.TelemetryEnabled
+			isInternalUser = existing.IsInternalUser
+		}
+
 		settings := &auth.Settings{
 			Credentials: auth.Credentials{
 				ClientID:     clientID,
 				ClientSecret: clientSecret,
 			},
-			OrganizationID: orgID,
-			Workspace:      workspace,
+			OrganizationID:   orgID,
+			Workspace:        workspace,
+			TelemetryEnabled: telemetryEnabled,
+			IsInternalUser:   isInternalUser,
 		}
 		if err := auth.WriteSettingsFile(settings); err != nil {
 			outputpkg.WriteError(map[string]any{"type": "error", "message": err.Error()})
 			os.Exit(1)
 		}
+
+		// Emit the configure event with the just-entered org_id. We
+		// can't reuse the global tracker (built before settings.json
+		// existed for a fresh install), so spin up a one-shot tracker
+		// here and flush it before returning.
+		mode := telemetry.ResolveMode(settings.TelemetryEnabled)
+		t := telemetry.New(mode, settings.OrganizationID, Version, settings.IsInternalUser)
+		t.TrackCommand(telemetry.CommandEvent{
+			Command:    "configure",
+			Success:    true,
+			DurationMs: time.Since(start).Milliseconds(),
+		})
+		t.Flush()
 
 		return outputpkg.WriteJSON(os.Stdout, map[string]string{
 			"status":  "saved",
