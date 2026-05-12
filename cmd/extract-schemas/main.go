@@ -137,7 +137,7 @@ func collectRefs() []registry.SpecRef {
 	var refs []registry.SpecRef
 	for _, res := range registry.All() {
 		for _, op := range res.Operations() {
-			if op.SpecRef.IsZero() {
+			if op.SpecRef.IsZero() || op.SpecRef.IsInternal() {
 				continue
 			}
 			key := op.SpecRef.Key()

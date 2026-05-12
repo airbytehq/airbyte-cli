@@ -2,6 +2,7 @@ package registry
 
 import (
 	"context"
+	"strings"
 
 	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 )
@@ -38,6 +39,13 @@ func (s SpecRef) Key() string {
 // IsZero reports whether the ref is unset (operation has no OpenAPI mapping).
 func (s SpecRef) IsZero() bool {
 	return s.Path == "" && s.Method == ""
+}
+
+// IsInternal reports whether the ref targets a non-public API route. Internal
+// routes are excluded from the embedded spec map and from the schema /
+// --describe surface — callers fall back to `--help` for argument details.
+func (s SpecRef) IsInternal() bool {
+	return strings.HasPrefix(s.Path, "/api/v1/internal/")
 }
 
 type OperationHooks struct {

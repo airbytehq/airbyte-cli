@@ -160,6 +160,13 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 		Short: op.Description,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if flags.GetDescribe() {
+				if op.SpecRef.IsInternal() {
+					writeStderrJSON(map[string]any{
+						"type":    "not_supported",
+						"message": fmt.Sprintf("no published schema for %q; run `%s --help` for argument details", op.Name, cmd.CommandPath()),
+					})
+					osExit(client.ExitNotFound)
+				}
 				if err := output.WriteJSON(os.Stdout, BuildSchemaOutput(*op)); err != nil {
 					writeStderrError("output_error", err.Error())
 					osExit(client.ExitGeneral)

@@ -31,6 +31,13 @@ introspection surface without knowing every resource name.`,
 		}
 		for _, op := range res.Operations() {
 			if op.Name == opName {
+				if op.SpecRef.IsInternal() {
+					return writeSchemaError(
+						"not_supported",
+						fmt.Sprintf("no published schema for %q %q; run `airbyte-agent %s %s --help` for argument details", resourceName, opName, resourceName, opName),
+						client.ExitNotFound,
+					)
+				}
 				return outputpkg.WriteJSON(os.Stdout, registry.BuildSchemaOutput(op))
 			}
 		}
