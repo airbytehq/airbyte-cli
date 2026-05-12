@@ -38,6 +38,12 @@ type settingsBody struct {
 	// destructive commands. Stored in the file so agent harnesses (which
 	// can't answer a prompt) can be granted this permission once.
 	AllowDestructive bool `json:"allow_destructive,omitempty"`
+	// TelemetryEnabled is a *bool so an absent key reads as "default"
+	// (true) rather than Go's zero-value false. configure writes it
+	// explicitly on every save, so the nil case only occurs for files
+	// predating this field.
+	TelemetryEnabled *bool `json:"telemetry_enabled,omitempty"`
+	IsInternalUser   bool  `json:"is_internal_user,omitempty"`
 }
 
 type credentialsBody struct {
@@ -72,6 +78,11 @@ func ReadSettingsFile() (*Settings, error) {
 		return nil, fmt.Errorf("parsing settings file: %w", err)
 	}
 
+	telemetryEnabled := true
+	if sf.Settings.TelemetryEnabled != nil {
+		telemetryEnabled = *sf.Settings.TelemetryEnabled
+	}
+
 	return &Settings{
 		Credentials: Credentials{
 			ClientID:     sf.Settings.Credentials.ClientID,
@@ -80,6 +91,8 @@ func ReadSettingsFile() (*Settings, error) {
 		OrganizationID:   sf.Settings.OrganizationID,
 		Workspace:        sf.Settings.Workspace,
 		AllowDestructive: sf.Settings.AllowDestructive,
+		TelemetryEnabled: telemetryEnabled,
+		IsInternalUser:   sf.Settings.IsInternalUser,
 	}, nil
 }
 
@@ -96,6 +109,7 @@ func WriteSettingsFile(s *Settings) error {
 		return fmt.Errorf("creating settings directory: %w", err)
 	}
 
+	telemetryEnabled := s.TelemetryEnabled
 	sf := settingsFile{
 		Settings: settingsBody{
 			Credentials: credentialsBody{
@@ -105,6 +119,8 @@ func WriteSettingsFile(s *Settings) error {
 			OrganizationID:   s.OrganizationID,
 			Workspace:        s.Workspace,
 			AllowDestructive: s.AllowDestructive,
+			TelemetryEnabled: &telemetryEnabled,
+			IsInternalUser:   s.IsInternalUser,
 		},
 	}
 	content, err := json.MarshalIndent(sf, "", "  ")
