@@ -8,13 +8,94 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 	"github.com/airbytehq/airbyte-agent-cli/internal/output"
+	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
-var osExit = os.Exit
+// osExit is overridable for tests. In production it flushes the
+// in-flight telemetry event before terminating so we don't drop events
+// on validation / API-error exit paths.
+var osExit = func(code int) {
+	emitPendingEvent()
+	os.Exit(code)
+}
+
+// tracker is the package-level telemetry emitter. main.go installs it
+// via SetTracker before the registry is built; tests leave it nil.
+// All emission goes through *Tracker's nil-safe methods.
+var tracker *telemetry.Tracker
+
+// SetTracker installs the tracker the registry emits to. Safe to call
+// once at startup with a nil value to disable emission.
+func SetTracker(t *telemetry.Tracker) {
+	tracker = t
+}
+
+// In-flight event state for the currently-running RunE. The CLI runs
+// one command per invocation, so a single package-level slot is safe.
+// Set at the top of RunE; emitted either by the deferred cleanup on
+// normal return or by osExit on early-exit paths. emitPendingEvent
+// guards against double-emission.
+var (
+	currentEvent      *telemetry.CommandEvent
+	currentEventStart time.Time
+	eventEmitted      bool
+)
+
+// beginTrackedCommand initializes the in-flight event for a RunE that
+// is about to execute. Each call resets the package-level slot — the
+// CLI runs one command per invocation, so the prior slot (if any) is
+// stale.
+func beginTrackedCommand(cmd *cobra.Command, op *Operation) {
+	currentEvent = &telemetry.CommandEvent{Command: trackedCommandName(cmd, op)}
+	currentEventStart = time.Now()
+	eventEmitted = false
+}
+
+// trackedCommandName returns the leaf command path, e.g.
+// "connectors execute". Uses cmd.Parent() so resource-name renames stay
+// reflected without the registry having to plumb the name through.
+func trackedCommandName(cmd *cobra.Command, op *Operation) string {
+	if cmd != nil && cmd.Parent() != nil && cmd.Parent().Name() != "" {
+		return cmd.Parent().Name() + " " + op.Name
+	}
+	return op.Name
+}
+
+// annotateEventFromParams pulls entity/action out of the params map for
+// `connectors execute` (the one tracked command where these have
+// meaningful operation-identifier semantics). For other commands the
+// keys are absent and this is a no-op.
+func annotateEventFromParams(params map[string]any) {
+	if currentEvent == nil {
+		return
+	}
+	if v, ok := params["entity"].(string); ok {
+		currentEvent.Entity = v
+	}
+	if v, ok := params["action"].(string); ok {
+		currentEvent.Action = v
+	}
+}
+
+// emitPendingEvent flushes the in-flight event to the tracker. Idempotent
+// per invocation — repeated calls within the same RunE no-op.
+func emitPendingEvent() {
+	if eventEmitted || currentEvent == nil {
+		return
+	}
+	eventEmitted = true
+	currentEvent.DurationMs = time.Since(currentEventStart).Milliseconds()
+	if currentEvent.ErrorType == "" {
+		currentEvent.Success = true
+	}
+	tracker.TrackCommand(*currentEvent)
+	tracker.Flush()
+}
 
 type flagAccessor interface {
 	GetFormat() string
@@ -87,6 +168,9 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 			}
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			beginTrackedCommand(cmd, op)
+			defer emitPendingEvent()
+
 			if len(buildErrors) > 0 {
 				return handleRunError(client.NewValidationError(
 					"operation schema has invalid parameter flags: "+strings.Join(buildErrors, "; "),
@@ -98,6 +182,8 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 			if err != nil {
 				return err
 			}
+
+			annotateEventFromParams(params)
 
 			ctx := context.Background()
 
@@ -430,5 +516,31 @@ func writeStderrError(errType, message string) {
 }
 
 func writeStderrJSON(payload map[string]any) {
+	captureErrorIntoEvent(payload)
 	output.WriteError(payload)
+}
+
+// captureErrorIntoEvent pulls error_type + status_code from an
+// about-to-be-emitted stderr payload into the in-flight event so the
+// telemetry side records the same failure shape the user sees, without
+// each call site having to remember.
+func captureErrorIntoEvent(payload map[string]any) {
+	if currentEvent == nil {
+		return
+	}
+	if currentEvent.ErrorType == "" {
+		if s, ok := payload["type"].(string); ok {
+			currentEvent.ErrorType = s
+		}
+	}
+	if currentEvent.StatusCode == 0 {
+		switch v := payload["status_code"].(type) {
+		case int:
+			currentEvent.StatusCode = v
+		case int64:
+			currentEvent.StatusCode = int(v)
+		case float64:
+			currentEvent.StatusCode = int(v)
+		}
+	}
 }

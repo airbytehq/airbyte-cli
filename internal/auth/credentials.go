@@ -33,6 +33,16 @@ type Settings struct {
 	// prompt. Intended as a one-time permission grant for agent harnesses
 	// that cannot answer a prompt.
 	AllowDestructive bool
+	// TelemetryEnabled controls whether the CLI emits anonymous usage
+	// events to Segment. Defaults to true when the file is missing the
+	// key. AIRBYTE_TELEMETRY_MODE=disabled forces this off regardless of
+	// the saved value.
+	TelemetryEnabled bool
+	// IsInternalUser marks the invocation as an Airbyte employee so
+	// internal events can be filtered out of customer analytics. Defaults
+	// to false when the file is missing the key. AIRBYTE_INTERNAL_USER
+	// overrides the saved value when set.
+	IsInternalUser bool
 }
 
 // ResolveSettings returns the Settings to use for the current invocation.
@@ -67,7 +77,16 @@ func fromEnv() (*Settings, bool) {
 		OrganizationID:   orgID,
 		Workspace:        os.Getenv("AIRBYTE_WORKSPACE"),
 		AllowDestructive: parseBoolEnv(os.Getenv("AIRBYTE_ALLOW_DESTRUCTIVE")),
+		TelemetryEnabled: !telemetryDisabledFromEnv(),
+		IsInternalUser:   parseBoolEnv(os.Getenv("AIRBYTE_INTERNAL_USER")),
 	}, true
+}
+
+// telemetryDisabledFromEnv reports whether AIRBYTE_TELEMETRY_MODE explicitly
+// disables telemetry. Any other value (empty, "basic", unrecognized) leaves
+// the decision to the settings file / default.
+func telemetryDisabledFromEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("AIRBYTE_TELEMETRY_MODE")), "disabled")
 }
 
 // parseBoolEnv treats common truthy strings ("1", "true", "yes", "on",
@@ -108,6 +127,12 @@ func fromFile() (*Settings, bool, error) {
 	// can't express a meaningful boolean.
 	if v := os.Getenv("AIRBYTE_ALLOW_DESTRUCTIVE"); v != "" {
 		s.AllowDestructive = parseBoolEnv(v)
+	}
+	if v := os.Getenv("AIRBYTE_INTERNAL_USER"); v != "" {
+		s.IsInternalUser = parseBoolEnv(v)
+	}
+	if telemetryDisabledFromEnv() {
+		s.TelemetryEnabled = false
 	}
 	return s, true, nil
 }

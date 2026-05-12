@@ -11,7 +11,7 @@
 > **Skills**: Per-command agent skill documents live at `skills/<command>/SKILL.md` (top-level `skills/` directory), each with YAML frontmatter (`name`, `description`, `command`). They are not embedded in the binary — they are distributed separately for agent harnesses to consume.
 
 > [!NOTE]
-> **Minimal Dependencies**: The CLI has only 2 external dependencies (Cobra + pflag). Everything else is stdlib. Do not add new dependencies without strong justification.
+> **Minimal Dependencies**: The CLI has 3 external dependencies (Cobra + pflag + segmentio/analytics-go). Everything else is stdlib. analytics-go is the deliberate exception for telemetry — see `internal/telemetry/`. Do not add additional dependencies without strong justification.
 
 ## Build & Test
 
@@ -49,6 +49,7 @@ The CLI uses a **resource-registry** pattern:
 | `internal/auth/` | Credential resolution (env -> file), OAuth token caching |
 | `internal/config/` | Environment variable configuration loader |
 | `internal/output/` | JSON and table output formatters |
+| `internal/telemetry/` | Segment-backed anonymous usage events. One `CLI Command Executed` event per tracked invocation. Hardcoded write key in `config.go`; tracker no-ops when key is empty, mode is disabled, or org_id is unresolved. |
 
 ### Registry (`internal/registry/`)
 
@@ -181,6 +182,9 @@ All three are also stored in the settings file (`~/.airbyte-agent/settings.json`
 | `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
 | `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `180` |
 | `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skips the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors the `allow_destructive` settings.json key. | `false` |
+| `AIRBYTE_TELEMETRY_MODE` | Set to `disabled` to turn off telemetry emission. Any other value (or unset) falls through to the `telemetry_enabled` key in settings.json. | (settings file) |
+| `AIRBYTE_INTERNAL_USER` | When truthy, tags emitted events with `is_internal_user: true` so internal events can be filtered out of customer analytics. Overrides the `is_internal_user` key in settings.json when non-empty. | (settings file) |
+| `AIRBYTE_EXECUTION_CONTEXT` | Self-reported invocation context (`mcp`, `agent`, `direct`). Emitted as the `execution_context` property on every telemetry event. | `direct` |
 
 Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions):
 
@@ -193,7 +197,9 @@ Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions
     },
     "organization_id": "your-org-id",
     "workspace": "default",
-    "allow_destructive": false
+    "allow_destructive": false,
+    "telemetry_enabled": true,
+    "is_internal_user": false
   }
 }
 ```
@@ -201,6 +207,10 @@ Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions
 `workspace` is optional. When absent or empty, commands that take a `workspace` parameter without receiving one fall back to the literal `"default"`. Resources read the configured value via `client.Client.DefaultWorkspace()`, which `main.go` populates from `Settings.Workspace`.
 
 `allow_destructive` is optional (default `false`). When `true`, destructive operations (currently `connectors delete`) skip the interactive `"Type 'yes' to confirm:"` prompt. Intended as a one-time permission grant for agent harnesses that can't answer a TTY prompt. The non-interactive default refuses with a clear `validation_error` rather than hanging on stdin. Resources read this via `client.Client.AllowDestructive()`.
+
+`telemetry_enabled` defaults to `true` when the key is absent (matching the documented default). `configure` always writes this key, so the absent case only occurs for settings files predating the field. `AIRBYTE_TELEMETRY_MODE=disabled` overrides the file value at runtime.
+
+`is_internal_user` defaults to `false`. Edit the file directly (or set `AIRBYTE_INTERNAL_USER=true`) to mark an invocation as Airbyte-internal so its events can be filtered out of customer analytics.
 
 ## Adding New Resources
 

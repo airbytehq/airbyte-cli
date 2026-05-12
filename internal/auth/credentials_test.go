@@ -313,6 +313,112 @@ func TestSettingsFile_InvalidJSON(t *testing.T) {
 	}
 }
 
+func TestSettingsFile_TelemetryEnabledRoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "")
+	t.Setenv("AIRBYTE_INTERNAL_USER", "")
+
+	original := &Settings{
+		Credentials:      Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID:   "org",
+		TelemetryEnabled: false,
+		IsInternalUser:   true,
+	}
+	if err := WriteSettingsFile(original); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+
+	loaded, err := ReadSettingsFile()
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	if loaded.TelemetryEnabled {
+		t.Error("TelemetryEnabled=false did not survive round-trip")
+	}
+	if !loaded.IsInternalUser {
+		t.Error("IsInternalUser=true did not survive round-trip")
+	}
+}
+
+func TestSettingsFile_TelemetryDefaultsTrueWhenAbsent(t *testing.T) {
+	// File predates the telemetry_enabled key → reads as the documented
+	// default (true), not Go's zero-value false.
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "")
+	t.Setenv("AIRBYTE_INTERNAL_USER", "")
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+
+	writeSettings(t, tmpDir, validSettingsJSON)
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if !s.TelemetryEnabled {
+		t.Error("TelemetryEnabled defaulted to false; expected true when key is absent")
+	}
+	if s.IsInternalUser {
+		t.Error("IsInternalUser defaulted to true; expected false when key is absent")
+	}
+}
+
+func TestResolveSettings_EnvTelemetryDisabledOverridesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_INTERNAL_USER", "")
+
+	// File explicitly enables telemetry; env explicitly disables it.
+	if err := WriteSettingsFile(&Settings{
+		Credentials:      Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID:   "org",
+		TelemetryEnabled: true,
+	}); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "disabled")
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if s.TelemetryEnabled {
+		t.Error("AIRBYTE_TELEMETRY_MODE=disabled did not override file value")
+	}
+}
+
+func TestResolveSettings_EnvInternalUserOverridesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "")
+
+	if err := WriteSettingsFile(&Settings{
+		Credentials:    Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID: "org",
+		IsInternalUser: false,
+	}); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+	t.Setenv("AIRBYTE_INTERNAL_USER", "true")
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if !s.IsInternalUser {
+		t.Error("AIRBYTE_INTERNAL_USER=true did not override file value")
+	}
+}
+
 func contains(s, sub string) bool {
 	for i := 0; i+len(sub) <= len(s); i++ {
 		if s[i:i+len(sub)] == sub {
