@@ -224,7 +224,7 @@ airbyte-agent connectors execute --fields data.id,data.email,meta.has_more --jso
 | `not_found` (exit 3) on connector | Name not found | Run `connectors list` to see exact names. The CLI matches against connector instance name, template display name, AND template slug, case-insensitively — so any of those works. |
 | `validation_error` (exit 4) on entity/action | Guessed entity name | Run `connectors describe` to enumerate entities. Actions are universal (see table above). |
 | Ambiguous name (exit 4) | Two connectors share a name | Pass `"id": "<uuid>"` in the JSON payload instead of `"name"`. |
-| `auth_error` (exit 2) | Credentials invalid or expired | Re-run `airbyte-agent enroll` to confirm the account is provisioned; if needed, re-run `airbyte-agent configure` to refresh credentials. |
+| `auth_error` (exit 2) | Credentials invalid or expired | Re-run `airbyte-agent configure` to refresh credentials. |
 | Empty `data: []` from `context_store_search` | Index lag, or filter too narrow | Retry with `"action": "list"` (live source). If still empty, broaden the filter. |
 
 ## Do NOT

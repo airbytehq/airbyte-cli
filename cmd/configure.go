@@ -30,6 +30,8 @@ The workspace is used as the fallback for any command that takes a
 		start := time.Now()
 		reader := bufio.NewReader(os.Stdin)
 
+		fmt.Fprintln(os.Stderr, "Find your Client ID, Client Secret, and Organization ID at Settings -> Profile in the airbyte.ai app")
+
 		clientID, err := promptRequired(reader, "Client ID")
 		if err != nil {
 			return err

@@ -48,7 +48,7 @@ airbyte-agent workspaces use --json '{"name": "Production"}'
 | `validation_error` (exit 4) | `name` parameter missing | Pass `--json '{"name": "<workspace>"}'` |
 | `not_found` (exit 3) on workspace | Workspace doesn't exist in this account | Run `airbyte-agent workspaces list --json '{}'` to see real names |
 | `not_found` (exit 3) on settings file | `~/.airbyte-agent/settings.json` missing | Run `airbyte-agent configure` first |
-| `auth_error` (exit 2) | Credentials invalid | Run `airbyte-agent enroll` to verify, then `airbyte-agent configure` if needed |
+| `auth_error` (exit 2) | Credentials invalid | Run `airbyte-agent configure` to refresh credentials |
 
 ## Hints
 
