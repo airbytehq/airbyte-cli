@@ -49,9 +49,6 @@ airbyte-agent <resource> <operation> --describe  # Show parameter schema
 # Configure credentials interactively
 airbyte-agent configure
 
-# Verify enrollment
-airbyte-agent enroll
-
 # Find your workspace
 airbyte-agent workspaces list --format table
 ```

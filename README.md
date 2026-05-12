@@ -201,7 +201,6 @@ airbyte-agent schema connectors execute           # equivalent top-level form
 | Command | Description |
 | --- | --- |
 | `configure` | Save credentials + organization id to `~/.airbyte-agent/settings.json` |
-| `enroll` | Check (and trigger) account enrollment & provisioning |
 | `schema <resource> <op>` | Print the merged CLI + OpenAPI schema for an operation |
 | `organizations list` | List organizations |
 | `workspaces list` | List/filter workspaces |
@@ -215,9 +214,6 @@ airbyte-agent schema connectors execute           # equivalent top-level form
 ### Examples
 
 ```bash
-# Verify (and if necessary trigger) enrollment
-airbyte-agent enroll
-
 # Find a workspace
 airbyte-agent workspaces list --json '{}'
 

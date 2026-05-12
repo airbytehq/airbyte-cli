@@ -9,7 +9,7 @@ command: airbyte-agent workspaces list
 > [!NOTE]
 > Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
-List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the second command in a session (after `airbyte-agent enroll`).
+List workspaces in the organization. Workspace names are the identifier passed to almost every connector command, so this is typically the first command in a session.
 
 > [!IMPORTANT]
 > Always pass parameters as `--json '{...}'` (use `--json '{}'` for an unfiltered list). Agents should not use per-parameter flags.
