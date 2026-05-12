@@ -297,9 +297,10 @@ func TestResourceMetadata(t *testing.T) {
 }
 
 // TestEveryOpSpecRefResolves asserts that every registered Operation with a
-// non-zero SpecRef points at a route that was extracted into the embedded
-// schema map. Catches the case where someone adds an op but forgets to
-// re-run `go generate ./...`.
+// public, non-zero SpecRef points at a route that was extracted into the
+// embedded schema map. Internal SpecRefs are intentionally excluded from the
+// map, so they're skipped here too. Catches the case where someone adds a
+// public op but forgets to re-run `go generate ./...`.
 func TestEveryOpSpecRefResolves(t *testing.T) {
 	resources := []registry.Resource{
 		&organizationsResource{},
@@ -308,7 +309,7 @@ func TestEveryOpSpecRefResolves(t *testing.T) {
 	}
 	for _, res := range resources {
 		for _, op := range res.Operations() {
-			if op.SpecRef.IsZero() {
+			if op.SpecRef.IsZero() || op.SpecRef.IsInternal() {
 				continue
 			}
 			if _, ok := spec.Lookup(op.SpecRef.Key()); !ok {
