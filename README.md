@@ -4,43 +4,15 @@ A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents
 
 The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte-agent <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `--describe`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
 
-## What it is
+## Features
 
-- **Resource-driven**: commands aren't hand-written Cobra trees. Resources are declared as Go structs in `internal/resources/`, registered into a global registry, and dynamically materialized into Cobra commands at startup.
-- **Self-describing**: any command will print its full parameter schema with `--describe`, so callers (especially LLMs) can discover required fields without guessing.
-- **Minimal**: only two external dependencies (Cobra + pflag). Everything else is stdlib.
-- **Distributable skills**: per-command agent skill documents live in `skills/<command>/SKILL.md` for downstream tooling (e.g. Claude Code) to consume directly.
+- **Uniform shape**: every command follows `airbyte-agent <resource> <operation>` with consistent flags.
+- **Self-describing**: append `--describe` to any command to print its full parameter schema, so agents and humans can discover required fields without guessing.
+- **Two ways to call**: per-flag (`--workspace foo --name bar`) for humans, `--json` for agents and complex payloads.
+- **Secure credential entry**: connector credentials are entered in a browser — never on the command line.
+- **Agent skills bundled**: per-command skill documents under `skills/` install directly into Claude Code and other agent harnesses.
 
-See `AGENTS.md` for the full architecture reference and `CONTEXT.md` for the agent-facing usage guide.
-
-## How it works
-
-```
-main.go
-  ├── config.Load()              # read env vars (AIRBYTE_API_HOST, etc.)
-  ├── auth.ResolveCredentials()  # env first, then ~/.airbyte-agent/credentials
-  ├── auth.NewTokenManager()     # OAuth token caching + auto-refresh
-  ├── client.New()               # HTTP client w/ retry + structured errors
-  ├── resources.RegisterAll()    # register every Resource into the registry
-  ├── registry.Build()           # convert registry → Cobra command tree
-  └── cmd.Execute()              # dispatch
-```
-
-| Package | Purpose |
-| --- | --- |
-| `cmd/` | Root Cobra command, persistent flags, version |
-| `internal/registry/` | `Resource` interface, dynamic command builder |
-| `internal/resources/` | Resource implementations |
-| `internal/spec/` | Generated OpenAPI request/response schemas |
-| `cmd/extract-schemas/` | Build-time generator: extracts the routes the CLI uses from `api/*.json` |
-| `api/` | Checked-in OpenAPI specs |
-| `skills/` | Per-command agent skill documents (`<command>/SKILL.md`) |
-| `internal/client/` | HTTP client (3x exponential-backoff retry on 429/5xx, 30s timeout) |
-| `internal/auth/` | Credential resolution, OAuth token caching |
-| `internal/config/` | Environment variable loader |
-| `internal/output/` | JSON and table formatters |
-
-The HTTP client retries 429/502/503/504 with backoff and surfaces non-retryable errors (400/401/403/404/422) as `APIError` values that map to deterministic exit codes.
+See [`AGENTS.md`](AGENTS.md) for the full architecture reference and [`CONTEXT.md`](CONTEXT.md) for the agent-facing usage guide.
 
 ## Install
 
@@ -70,9 +42,41 @@ Or directly without the Makefile:
 go build -o airbyte-agent .
 ```
 
+## Skills
+
+Per-command agent skill documents live under `skills/<command>/SKILL.md`, each with YAML frontmatter (`name`, `description`, `command`) and task-oriented guidance. They are designed to be consumed by agent harnesses (e.g. Claude Code).
+
+The skills work alongside the CLI — they tell the agent *how* to invoke each command, while the `airbyte-agent` binary does the actual work. Install the CLI first, then install the skills into your agent.
+
+### Install via `npx skills`
+
+The [`skills`](https://github.com/vercel-labs/skills) installer discovers the `skills/` directory in this repo and wires each `SKILL.md` into your agent (Claude Code, etc.):
+
+```bash
+# Install all skills
+npx skills add airbytehq/airbyte-agent-cli
+
+# Install one skill
+npx skills add airbytehq/airbyte-agent-cli --skill connectors-execute
+
+# Preview without installing
+npx skills add airbytehq/airbyte-agent-cli --list
+
+# Install globally instead of per-project
+npx skills add airbytehq/airbyte-agent-cli -g
+```
+
+Target a specific agent with `--agent claude-code` (or another supported agent). See the [`skills` CLI docs](https://github.com/vercel-labs/skills) for the full flag set.
+
+### Manual install
+
+Copy or symlink `skills/<command>/` into your agent's skill directory directly (e.g. `~/.claude/skills/` for Claude Code).
+
 ## Configure
 
 Settings can be supplied via environment variables or a settings file at `~/.airbyte-agent/settings.json` (JSON, `0600` permissions). Three pieces of information are always required: client ID, client secret, and organization ID.
+
+Run `airbyte-agent configure` to be prompted for these values and have the file written for you with the right permissions.
 
 ### Resolution order
 
@@ -93,6 +97,8 @@ Env vars take precedence over the file when all three are present, so they're us
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
 | `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
 | `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `180` |
+| `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skip the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors `allow_destructive` in the settings file. | `false` |
+| `AIRBYTE_TELEMETRY_MODE` | Set to `disabled` to turn off telemetry. Any other value (or unset) falls through to `telemetry_enabled` in the settings file. | (settings file) |
 
 ### Settings file
 
@@ -106,14 +112,21 @@ Env vars take precedence over the file when all three are present, so they're us
       "client_secret": "your-client-secret"
     },
     "organization_id": "your-org-id",
-    "workspace": "default"
+    "workspace": "default",
+    "allow_destructive": false,
+    "telemetry_enabled": true
   }
 }
 ```
 
-`workspace` is optional — when absent (or empty), commands that take a `workspace` parameter and don't receive one fall back to the literal `"default"`. Set it once here and you'll never need `--json '{"workspace": "..."}'` for your usual workspace.
-
-Run `airbyte-agent configure` to be prompted for these values and have the file written for you with the right permissions.
+| Key | Description | Default |
+| --- | --- | --- |
+| `credentials.client_id` | OAuth client ID | (required) |
+| `credentials.client_secret` | OAuth client secret | (required) |
+| `organization_id` | Organization ID | (required) |
+| `workspace` | Default workspace name; commands that take a `workspace` parameter fall back to this when not provided | `default` |
+| `allow_destructive` | When `true`, destructive commands (e.g. `connectors delete`) skip the interactive confirmation prompt. Intended as a one-time permission grant for agent harnesses without TTY input. | `false` |
+| `telemetry_enabled` | When `false`, anonymous usage telemetry is disabled. Can also be turned off at runtime with `AIRBYTE_TELEMETRY_MODE=disabled`. | `true` |
 
 ## Usage
 
@@ -196,21 +209,6 @@ airbyte-agent schema connectors execute           # equivalent top-level form
 
 `--describe` and `airbyte-agent schema <resource> <operation>` return the same payload: CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
 
-### Command surface
-
-| Command | Description |
-| --- | --- |
-| `configure` | Save credentials + organization id to `~/.airbyte-agent/settings.json` |
-| `schema <resource> <op>` | Print the merged CLI + OpenAPI schema for an operation |
-| `organizations list` | List organizations |
-| `workspaces list` | List/filter workspaces |
-| `connectors list` | List connectors in a workspace |
-| `connectors list-available` | List connector templates |
-| `connectors describe` | Show a connector's entities and actions |
-| `connectors execute` | Run an action on a connector |
-| `connectors create` | Interactive browser-based credential flow |
-| `connectors delete` | Delete a connector |
-
 ### Examples
 
 ```bash
@@ -243,54 +241,6 @@ airbyte-agent connectors execute --json @params.json
 
 The CLI never accepts API keys, tokens, or passwords as command-line parameters. `connectors create` opens a browser-based widget, runs an OAuth session, polls until the user submits, then creates the connector with the returned credentials. If you're an agent, do not ask the user to paste secrets — start the credential flow.
 
-## Errors and exit codes
-
-All errors are emitted as JSON on stderr.
-
-```json
-{"type": "not_found", "message": "...", "status_code": 404, "retryable": false}
-```
-
-| Exit code | Meaning | HTTP |
-| --- | --- | --- |
-| `0` | Success | 2xx |
-| `1` | General error | 500, others |
-| `2` | Authentication error | 401, 403 |
-| `3` | Not found | 404 |
-| `4` | Validation error | 400, 422 |
-
-When you see a validation error, re-run the command with `--describe` to inspect the expected schema.
-
-## Skills
-
-Per-command agent skill documents live under `skills/<command>/SKILL.md`, each with YAML frontmatter (`name`, `description`, `command`) and task-oriented guidance. They are designed to be consumed by agent harnesses (e.g. Claude Code).
-
-The skills work alongside the CLI — they tell the agent *how* to invoke each command, while the `airbyte-agent` binary does the actual work. Install the CLI first (see [Install](#install)), then install the skills into your agent.
-
-### Install via `npx skills`
-
-The [`skills`](https://github.com/vercel-labs/skills) installer discovers the `skills/` directory in this repo and wires each `SKILL.md` into your agent (Claude Code, etc.):
-
-```bash
-# Install all skills
-npx skills add airbytehq/airbyte-agent-cli
-
-# Install one skill
-npx skills add airbytehq/airbyte-agent-cli --skill connectors-execute
-
-# Preview without installing
-npx skills add airbytehq/airbyte-agent-cli --list
-
-# Install globally instead of per-project
-npx skills add airbytehq/airbyte-agent-cli -g
-```
-
-Target a specific agent with `--agent claude-code` (or another supported agent). See the [`skills` CLI docs](https://github.com/vercel-labs/skills) for the full flag set.
-
-### Manual install
-
-Copy or symlink `skills/<command>/` into your agent's skill directory directly (e.g. `~/.claude/skills/` for Claude Code).
-
 ## Develop
 
 ```bash
@@ -299,7 +249,7 @@ go test ./...
 go vet ./...
 ```
 
-To add a new resource: implement the `Resource` interface in `internal/resources/<name>.go`, register it in `register.go`, and add tests using the existing `newTestTokenServer()` / `newTestClient()` helpers. See `AGENTS.md` for the full guide.
+To add a new resource: implement the `Resource` interface in `internal/resources/<name>.go`, register it in `register.go`, and add tests using the existing `newTestTokenServer()` / `newTestClient()` helpers. See [`AGENTS.md`](AGENTS.md) for the full guide.
 
 ## Releases
 
@@ -357,13 +307,6 @@ The snapshot run produces real artifacts in `dist/` so you can confirm the formu
 - **Formula already committed but binaries broken.** Delete the formula commit on `homebrew-tap` (open a one-line revert PR), then retag a new patch version. Don't re-use the same tag.
 - **Need to yank a published release.** Delete the formula commit on `homebrew-tap`. Existing `brew install`s won't rollback automatically; users with the broken version will keep it until they `brew upgrade airbyte-agent`. Consider a `0.x.y+1` patch release rather than a yank when possible — fewer surprises for users.
 
-### Required secrets
+## License
 
-The workflow expects two secrets in this repo (organization-level is fine):
-
-| Secret | Purpose |
-| --- | --- |
-| `OCTAVIA_BOT_APP_ID` | GitHub App ID for the bot that pushes the formula commit |
-| `OCTAVIA_BOT_PRIVATE_KEY` | Private key for the same GitHub App |
-
-The App's installation must include both `airbytehq/airbyte-agent-cli` and `airbytehq/homebrew-tap`, with `contents: write` permission on both.
+[Elastic License 2.0](LICENSE).

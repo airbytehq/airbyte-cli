@@ -67,6 +67,11 @@ release:
 # airbytehq/homebrew-tap repo on each non-prerelease release. Cross-repo write
 # requires a separate token (HOMEBREW_TAP_GITHUB_TOKEN) — the default
 # GITHUB_TOKEN issued by the workflow only has access to this repo.
+#
+# Note: `brews` is deprecated in goreleaser in favor of `homebrew_casks`. We are
+# intentionally still using `brews` because casks are intended for signed/notarized
+# macOS binaries and our binaries are unsigned. Revisit when goreleaser removes
+# `brews` entirely or when we start signing release binaries.
 brews:
   - name: airbyte-agent
     repository:
@@ -77,7 +82,7 @@ brews:
     directory: Formula
     homepage: https://github.com/airbytehq/airbyte-agent-cli
     description: CLI for Airbyte Agents, designed for use by both humans and agents
-    license: ELv2
+    license: Elastic-2.0
     install: |
       bin.install "airbyte-agent"
     test: |

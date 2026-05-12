@@ -176,9 +176,10 @@ Errors include a `hint` field with actionable guidance:
 
 ```json
 {
-  "error": "not_found",
+  "type": "not_found",
   "message": "connector \"gong\" not found in workspace \"default\"",
   "status_code": 404,
+  "retryable": false,
   "hint": "run 'airbyte-agent connectors list --json '{\"workspace\": \"default\"}'' to see available connectors"
 }
 ```
@@ -187,19 +188,21 @@ API errors (400/422) include the full server response in `detail`:
 
 ```json
 {
-  "error": "validation_error",
+  "type": "validation_error",
   "message": "Invalid configuration",
   "status_code": 400,
+  "retryable": false,
   "detail": {"errors": [{"field": "host", "message": "is required"}]}
 }
 ```
 
-When you see a validation error with missing fields, use `--describe` to check the schema:
+When you see a validation error for missing parameters, use `--describe` to check the schema:
 
 ```json
 {
-  "error": "validation_error",
-  "fields": {"entity": "required", "action": "required"},
+  "type": "validation_error",
+  "message": "missing required parameters: entity, action",
+  "status_code": 400,
   "hint": "run this command with --describe to see the expected parameter schema"
 }
 ```

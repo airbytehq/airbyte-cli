@@ -121,7 +121,7 @@ The credential flow works as follows:
 1. Resolve template ID (by name or ID)
 2. Create a widget token for the web app
 3. Create an OAuth session for the source definition
-4. Open browser to `<webapp>/embedded-widget/credentials?session_id=...&token=...`
+4. Open browser to `<webapp>/widget-bridge?widget_token=...&session=...&selectedTemplateId=...`
 5. Poll session status with exponential backoff (2s, 4s, 8s, 16s)
 6. On completion, create the connector with returned credentials
 
