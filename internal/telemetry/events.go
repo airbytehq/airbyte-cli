@@ -13,7 +13,7 @@ const EventName = "CLI Command Executed"
 // CLI where session = invocation = one event.
 type CommandEvent struct {
 	// Command is the leaf command name, e.g. "connectors execute",
-	// "enroll", "configure".
+	// "configure".
 	Command string
 	// Success is false when the operation returned an error or exited
 	// via a non-zero exit code.

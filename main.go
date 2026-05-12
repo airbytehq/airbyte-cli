@@ -33,8 +33,6 @@ func main() {
 		)
 	}
 
-	cmd.SetAPIClient(c)
-	cmd.SetTracker(t)
 	registry.SetTracker(t)
 	resources.RegisterAll()
 	registry.Build(cmd.GetRootCmd(), c, cmd.FlagAccessor())
