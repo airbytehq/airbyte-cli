@@ -4,14 +4,6 @@ A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents
 
 The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte-agent <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `--describe`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
 
-## Features
-
-- **Uniform shape**: every command follows `airbyte-agent <resource> <operation>` with consistent flags.
-- **Self-describing**: append `--describe` to any command to print its full parameter schema, so agents and humans can discover required fields without guessing.
-- **Two ways to call**: per-flag (`--workspace foo --name bar`) for humans, `--json` for agents and complex payloads.
-- **Secure credential entry**: connector credentials are entered in a browser — never on the command line.
-- **Agent skills bundled**: per-command skill documents under `skills/` install directly into Claude Code and other agent harnesses.
-
 See [`AGENTS.md`](AGENTS.md) for the full architecture reference and [`CONTEXT.md`](CONTEXT.md) for the agent-facing usage guide.
 
 ## Install
@@ -74,7 +66,7 @@ Copy or symlink `skills/<command>/` into your agent's skill directory directly (
 
 ## Configure
 
-Settings can be supplied via environment variables or a settings file at `~/.airbyte-agent/settings.json` (JSON, `0600` permissions). Three pieces of information are always required: client ID, client secret, and organization ID.
+Settings can be supplied via environment variables or a settings file at `~/.airbyte-agent/settings.json`. Three pieces of information are always required: client ID, client secret, and organization ID.
 
 Run `airbyte-agent configure` to be prompted for these values and have the file written for you with the right permissions.
 
@@ -236,10 +228,6 @@ airbyte-agent connectors create --json '{
 # Load a complex payload from a file
 airbyte-agent connectors execute --json @params.json
 ```
-
-## Credentials are entered in the browser, not the CLI
-
-The CLI never accepts API keys, tokens, or passwords as command-line parameters. `connectors create` opens a browser-based widget, runs an OAuth session, polls until the user submits, then creates the connector with the returned credentials. If you're an agent, do not ask the user to paste secrets — start the credential flow.
 
 ## Develop
 
