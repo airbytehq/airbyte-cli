@@ -67,6 +67,9 @@ func TestClient_Get_AuthHeaders(t *testing.T) {
 	if org := gotHeaders.Get("X-Organization-Id"); org != "org-123" {
 		t.Errorf("X-Organization-Id = %q, want %q", org, "org-123")
 	}
+	if cli := gotHeaders.Get("X-Adp-Agent-Cli"); cli != "1.0.0-test" {
+		t.Errorf("X-ADP-Agent-CLI = %q, want %q", cli, "1.0.0-test")
+	}
 
 	var parsed map[string]string
 	if err := json.Unmarshal(result, &parsed); err != nil {
