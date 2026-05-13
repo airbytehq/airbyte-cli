@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +19,7 @@ var rootCmd = &cobra.Command{
 	Short: "Airbyte Agents CLI",
 	Long:  "Command-line interface for interacting with the Airbyte platform.",
 	Run: func(cmd *cobra.Command, args []string) {
-		_ = cmd.Help()
+		printSplash(os.Stdout)
 	},
 	SilenceUsage:  true,
 	SilenceErrors: true,
