@@ -29,6 +29,7 @@ type Client struct {
 	defaultWorkspace string
 	allowDestructive bool
 	userAgent        string
+	version          string
 	tokenManager     *auth.TokenManager
 	httpClient       *http.Client
 	debug            bool
@@ -88,6 +89,7 @@ func New(apiHost, organizationID, version string, tm *auth.TokenManager, opts ..
 		apiHost:        apiHost,
 		organizationID: organizationID,
 		userAgent:      "airbyte-agent-cli/" + version,
+		version:        version,
 		tokenManager:   tm,
 		httpClient:     &http.Client{Timeout: requestTimeout},
 	}
@@ -202,6 +204,7 @@ func (c *Client) doOnce(ctx context.Context, method, rawURL string, body io.Read
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set("X-ADP-Agent-CLI", c.version)
 	if c.organizationID != "" {
 		req.Header.Set("X-Organization-Id", c.organizationID)
 	}
