@@ -127,7 +127,7 @@ func TestTrackCommand_OmitsEmptyOptionalFields(t *testing.T) {
 		cliVersion:     "1.0",
 		anonymousID:    "anon",
 	}
-	tr.TrackCommand(CommandEvent{Command: "configure", Success: true, DurationMs: 7})
+	tr.TrackCommand(CommandEvent{Command: "login", Success: true, DurationMs: 7})
 
 	fake.mu.Lock()
 	defer fake.mu.Unlock()

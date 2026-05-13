@@ -68,4 +68,4 @@ Use whichever fits your flow. `airbyte-agent schema` is the discoverable top-lev
 
 - `--describe` and `airbyte-agent schema` never make API calls — safe to run without auth, against unfamiliar accounts, etc.
 - Errors from `airbyte-agent schema` (unknown resource or operation) are JSON on stderr with exit code 3.
-- Operations that don't map to an OpenAPI route omit the `api` block. (`airbyte-agent configure` is also purely local but isn't a registered operation — it's a top-level command.)
+- Operations that don't map to an OpenAPI route omit the `api` block. (`airbyte-agent login` is also purely local but isn't a registered operation — it's a top-level command.)

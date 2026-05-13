@@ -69,7 +69,7 @@ func useWorkspace(ctx context.Context, c *client.Client, params map[string]any) 
 		if os.IsNotExist(err) {
 			return nil, client.NewNotFoundError(
 				"settings file does not exist",
-				"run 'airbyte-agent configure' first to create ~/.airbyte-agent/settings.json",
+				"run 'airbyte-agent login' first to create ~/.airbyte-agent/settings.json",
 			)
 		}
 		return nil, fmt.Errorf("reading settings: %w", err)
