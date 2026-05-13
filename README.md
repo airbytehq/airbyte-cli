@@ -68,7 +68,7 @@ Copy or symlink `skills/<command>/` into your agent's skill directory directly (
 
 Settings can be supplied via environment variables or a settings file at `~/.airbyte-agent/settings.json`. Three pieces of information are always required: client ID, client secret, and organization ID.
 
-Run `airbyte-agent configure` to be prompted for these values and have the file written for you with the right permissions.
+Run `airbyte-agent login` to be prompted for these values and have the file written for you with the right permissions.
 
 ### Resolution order
 

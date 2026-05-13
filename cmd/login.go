@@ -12,10 +12,11 @@ import (
 	outputpkg "github.com/airbytehq/airbyte-agent-cli/internal/output"
 	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
-var configureCmd = &cobra.Command{
-	Use:   "configure",
+var loginCmd = &cobra.Command{
+	Use:   "login",
 	Short: "Configure credentials and organization id interactively",
 	Long: `Prompt for client_id, client_secret, organization_id, and a default
 workspace, then save them to ~/.airbyte-agent/settings.json with 0600 permissions.
@@ -36,7 +37,7 @@ The workspace is used as the fallback for any command that takes a
 		if err != nil {
 			return err
 		}
-		clientSecret, err := promptRequired(reader, "Client Secret")
+		clientSecret, err := promptSecret(reader, "Client Secret")
 		if err != nil {
 			return err
 		}
@@ -50,7 +51,7 @@ The workspace is used as the fallback for any command that takes a
 		}
 
 		// Preserve telemetry / internal-user values from any prior
-		// settings file so re-running configure doesn't reset what the
+		// settings file so re-running login doesn't reset what the
 		// user previously set. Missing file → use the documented
 		// defaults (telemetry on, internal off).
 		telemetryEnabled := true
@@ -75,14 +76,14 @@ The workspace is used as the fallback for any command that takes a
 			os.Exit(1)
 		}
 
-		// Emit the configure event with the just-entered org_id. We
+		// Emit the login event with the just-entered org_id. We
 		// can't reuse the global tracker (built before settings.json
 		// existed for a fresh install), so spin up a one-shot tracker
 		// here and flush it before returning.
 		mode := telemetry.ResolveMode(settings.TelemetryEnabled)
 		t := telemetry.New(mode, settings.OrganizationID, Version, settings.IsInternalUser)
 		t.TrackCommand(telemetry.CommandEvent{
-			Command:    "configure",
+			Command:    "login",
 			Success:    true,
 			DurationMs: time.Since(start).Milliseconds(),
 		})
@@ -95,7 +96,7 @@ The workspace is used as the fallback for any command that takes a
 	},
 }
 
-var configureShowCmd = &cobra.Command{
+var loginShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Print the saved settings (with the client secret obfuscated)",
 	Long: `Read ~/.airbyte-agent/settings.json and print its contents as JSON. The
@@ -114,7 +115,7 @@ shown here when the CLI actually makes API calls.`,
 				outputpkg.WriteError(map[string]any{
 					"type":    "not_found",
 					"message": "settings file does not exist",
-					"hint":    "run 'airbyte-agent configure' to create ~/.airbyte-agent/settings.json",
+					"hint":    "run 'airbyte-agent login' to create ~/.airbyte-agent/settings.json",
 				})
 				os.Exit(client.ExitNotFound)
 			}
@@ -146,8 +147,8 @@ func obfuscateSecret(s string) string {
 }
 
 func init() {
-	configureCmd.AddCommand(configureShowCmd)
-	rootCmd.AddCommand(configureCmd)
+	loginCmd.AddCommand(loginShowCmd)
+	rootCmd.AddCommand(loginCmd)
 }
 
 func promptRequired(reader *bufio.Reader, label string) (string, error) {
@@ -157,6 +158,37 @@ func promptRequired(reader *bufio.Reader, label string) (string, error) {
 		return "", fmt.Errorf("reading %s: %w", label, err)
 	}
 	value = strings.TrimSpace(value)
+	if value == "" {
+		outputpkg.WriteError(map[string]any{
+			"type":    "validation_error",
+			"message": fmt.Sprintf("%s is required", label),
+		})
+		os.Exit(4)
+	}
+	return value, nil
+}
+
+// promptSecret prompts for a value and masks the input when stdin is a
+// terminal. Falls back to a plain line read when stdin is piped (e.g.
+// scripted setup), since there's nothing to mask in that case.
+func promptSecret(reader *bufio.Reader, label string) (string, error) {
+	fmt.Fprintf(os.Stderr, "%s: ", label)
+	fd := int(os.Stdin.Fd())
+	var value string
+	if term.IsTerminal(fd) {
+		b, err := term.ReadPassword(fd)
+		fmt.Fprintln(os.Stderr)
+		if err != nil {
+			return "", fmt.Errorf("reading %s: %w", label, err)
+		}
+		value = strings.TrimSpace(string(b))
+	} else {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return "", fmt.Errorf("reading %s: %w", label, err)
+		}
+		value = strings.TrimSpace(line)
+	}
 	if value == "" {
 		outputpkg.WriteError(map[string]any{
 			"type":    "validation_error",

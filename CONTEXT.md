@@ -47,7 +47,7 @@ airbyte-agent <resource> <operation> --describe  # Show parameter schema
 
 ```bash
 # Configure credentials interactively
-airbyte-agent configure
+airbyte-agent login
 
 # Find your workspace
 airbyte-agent workspaces list --format table

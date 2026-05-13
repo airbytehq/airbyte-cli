@@ -27,7 +27,7 @@ airbyte-agent workspaces use --json '{"name": "Production"}'
 
 ## When to use
 
-- **Right after `airbyte-agent configure`** — typically the second step in onboarding once you know which workspace you'll be working in.
+- **Right after `airbyte-agent login`** — typically the second step in onboarding once you know which workspace you'll be working in.
 - **When switching projects** — instead of typing `--json '{"workspace": "..."}'` on every command, set it once.
 - **After creating a new workspace** that should become the default.
 
@@ -47,8 +47,8 @@ airbyte-agent workspaces use --json '{"name": "Production"}'
 |---|---|---|
 | `validation_error` (exit 4) | `name` parameter missing | Pass `--json '{"name": "<workspace>"}'` |
 | `not_found` (exit 3) on workspace | Workspace doesn't exist in this account | Run `airbyte-agent workspaces list --json '{}'` to see real names |
-| `not_found` (exit 3) on settings file | `~/.airbyte-agent/settings.json` missing | Run `airbyte-agent configure` first |
-| `auth_error` (exit 2) | Credentials invalid | Run `airbyte-agent configure` to refresh credentials |
+| `not_found` (exit 3) on settings file | `~/.airbyte-agent/settings.json` missing | Run `airbyte-agent login` first |
+| `auth_error` (exit 2) | Credentials invalid | Run `airbyte-agent login` to refresh credentials |
 
 ## Hints
 

@@ -38,7 +38,7 @@ The CLI uses a **resource-registry** pattern:
 | Package | Purpose |
 | --- | --- |
 | `main.go` | Entry point: config -> auth -> client -> registry -> execute |
-| `cmd/` | Root Cobra command, persistent flags, version command |
+| `cmd/` | Root Cobra command, persistent flags, version and login commands |
 | `internal/registry/` | Resource/Operation types, dynamic Cobra command builder |
 | `internal/resources/` | All resource implementations |
 | `internal/spec/` | OpenAPI request/response schemas (extracted at build time) |
@@ -206,7 +206,7 @@ Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions
 
 `allow_destructive` is optional (default `false`). When `true`, destructive operations (currently `connectors delete`) skip the interactive `"Type 'yes' to confirm:"` prompt. Intended as a one-time permission grant for agent harnesses that can't answer a TTY prompt. The non-interactive default refuses with a clear `validation_error` rather than hanging on stdin. Resources read this via `client.Client.AllowDestructive()`.
 
-`telemetry_enabled` defaults to `true` when the key is absent (matching the documented default). `configure` always writes this key, so the absent case only occurs for settings files predating the field. `AIRBYTE_TELEMETRY_MODE=disabled` overrides the file value at runtime.
+`telemetry_enabled` defaults to `true` when the key is absent (matching the documented default). `login` always writes this key, so the absent case only occurs for settings files predating the field. `AIRBYTE_TELEMETRY_MODE=disabled` overrides the file value at runtime.
 
 `is_internal_user` defaults to `false`. Edit the file directly (or set `AIRBYTE_INTERNAL_USER=true`) to mark an invocation as Airbyte-internal so its events can be filtered out of customer analytics.
 
