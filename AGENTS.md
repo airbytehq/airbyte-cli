@@ -141,6 +141,9 @@ All errors are returned as JSON on stderr:
 {"type": "<error_type>", "message": "...", "status_code": 400, "retryable": false}
 ```
 
+> [!NOTE]
+> **Unknown commands**: Invoking an unknown command or subcommand (e.g., `airbyte-agent nothing`, `airbyte-agent connectors notarealthing`) returns an `unknown_command` error on stderr. The payload includes `available_commands` (scoped to the parent), `did_you_mean` (Levenshtein-close suggestions, omitted when empty), and a `hint` pointing at `--help`. Exit code is `4` (validation). No `status_code` / `retryable` fields — the error is local, not from the API.
+
 ### Exit Codes
 
 | Code | Meaning | HTTP Status |

@@ -109,6 +109,7 @@ func Build(rootCmd *cobra.Command, c *client.Client, flags flagAccessor) {
 		resCmd := &cobra.Command{
 			Use:   res.Name(),
 			Short: res.Description(),
+			Args:  UnknownSubcommandArgs,
 			Run: func(cmd *cobra.Command, args []string) {
 				_ = cmd.Help()
 			},
