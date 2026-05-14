@@ -300,4 +300,3 @@ func newReleasesServer(t *testing.T, tag, htmlURL string) *httptest.Server {
 		_ = json.NewEncoder(w).Encode(githubRelease{TagName: tag, HTMLURL: htmlURL})
 	}))
 }
-
