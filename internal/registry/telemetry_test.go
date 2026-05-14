@@ -68,7 +68,7 @@ func TestRegistryEmitsEventOnSuccess(t *testing.T) {
 	))
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: t.TempDir() + "/out.json"}
+	flags := &stubFlags{output: t.TempDir() + "/out.json"}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"widgets", "list"})
@@ -121,7 +121,7 @@ func TestRegistryEmitsEventOnValidationError(t *testing.T) {
 	defer restoreExit()
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	// Missing the required `name` param triggers validateParams →
 	// writeStderrJSON → osExit (the wrapped one that flushes telemetry).
@@ -174,7 +174,7 @@ func TestRegistryAnnotatesEntityActionForExecute(t *testing.T) {
 	))
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: t.TempDir() + "/out.json"}
+	flags := &stubFlags{output: t.TempDir() + "/out.json"}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"connectors", "execute", "--entity", "customers", "--action", "list"})

@@ -98,7 +98,6 @@ func emitPendingEvent() {
 }
 
 type flagAccessor interface {
-	GetFormat() string
 	GetOutput() string
 	GetFields() []string
 }
@@ -137,7 +136,6 @@ type paramBinding struct {
 }
 
 var reservedFlagNames = map[string]bool{
-	"format":  true,
 	"help":    true,
 	"json":    true,
 	"output":  true,
@@ -495,7 +493,7 @@ func writeResult(result any, flags flagAccessor) error {
 	if fields := flags.GetFields(); len(fields) > 0 {
 		result = output.Filter(result, fields)
 	}
-	return output.Write(result, flags.GetFormat(), flags.GetOutput())
+	return output.Write(result, flags.GetOutput())
 }
 
 func writeStderrError(errType, message string) {

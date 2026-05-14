@@ -48,7 +48,7 @@ The CLI uses a **resource-registry** pattern:
 | `internal/client/` | HTTP client with retry logic, structured error types |
 | `internal/auth/` | Credential resolution (env -> file), OAuth token caching |
 | `internal/config/` | Environment variable configuration loader |
-| `internal/output/` | JSON and table output formatters |
+| `internal/output/` | JSON output formatter |
 | `internal/telemetry/` | Segment-backed anonymous usage events. One `CLI Command Executed` event per tracked invocation. Hardcoded write key in `config.go`; tracker no-ops when key is empty, mode is disabled, or org_id is unresolved. |
 
 ### Registry (`internal/registry/`)
@@ -101,7 +101,6 @@ The CLI uses a **resource-registry** pattern:
 
 | Flag | Description | Default |
 | --- | --- | --- |
-| `--format` | Output format: `json` or `table` | `json` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--json` | Operation flag for inline JSON parameters; mutually exclusive with per-parameter flags | -- |

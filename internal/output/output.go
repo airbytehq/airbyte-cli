@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-func Write(data any, format, outputPath string) error {
+func Write(data any, outputPath string) error {
 	var w io.Writer = os.Stdout
 	if outputPath != "" {
 		f, err := os.Create(outputPath)
@@ -16,13 +16,7 @@ func Write(data any, format, outputPath string) error {
 		defer func() { _ = f.Close() }()
 		w = f
 	}
-
-	switch format {
-	case "table":
-		return WriteTable(w, data)
-	default:
-		return WriteJSON(w, data)
-	}
+	return WriteJSON(w, data)
 }
 
 func WriteError(data any) {

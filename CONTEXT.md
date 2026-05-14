@@ -21,7 +21,7 @@ This document tells AI agents how to use the `airbyte-agent` CLI. For developmen
 airbyte-agent <resource> <operation> [flags]
 ```
 
-All parameters are passed via `--json '<JSON>'` or `--id '<ID>'`. Output goes to stdout as JSON (default) or table format.
+All parameters are passed via `--json '<JSON>'` or `--id '<ID>'`. Output goes to stdout as JSON.
 
 ```bash
 airbyte-agent --help                              # List all resources
@@ -35,7 +35,6 @@ airbyte-agent schema <resource> <operation>       # Show parameter schema (CLI +
 | --- | --- | --- |
 | `--json` | Inline JSON parameters | -- |
 | `--id` | Convenience flag for resource ID | -- |
-| `--format` | Output format: `json` or `table` | `json` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--fields` | Filter response to listed fields (comma-separated dotted paths, e.g. `data.id,data.name`). Client-side; not applied to errors. | -- |
@@ -49,7 +48,7 @@ airbyte-agent schema <resource> <operation>       # Show parameter schema (CLI +
 airbyte-agent login
 
 # Find your workspace
-airbyte-agent workspaces list --format table
+airbyte-agent workspaces list
 ```
 
 ### 2. Listing and Discovering Connectors
@@ -59,7 +58,7 @@ airbyte-agent workspaces list --format table
 airbyte-agent connectors list --json '{"workspace": "my-workspace"}'
 
 # List available connector templates (for creating new connectors)
-airbyte-agent connectors list-available --format table
+airbyte-agent connectors list-available
 
 # Describe a connector to see its entities and actions
 airbyte-agent connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
@@ -113,7 +112,7 @@ airbyte-agent connectors execute --json '{
 
 ```bash
 # Browse available templates
-airbyte-agent connectors list-available --format table
+airbyte-agent connectors list-available
 
 # Create (opens browser for secure credential entry)
 airbyte-agent connectors create --json '{

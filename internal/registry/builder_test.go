@@ -19,13 +19,8 @@ func stubClient() *client.Client {
 }
 
 type stubFlags struct {
-	format string
 	output string
 	fields []string
-}
-
-func (s *stubFlags) GetFormat() string {
-	return s.format
 }
 
 func (s *stubFlags) GetOutput() string {
@@ -42,7 +37,6 @@ func newTestRoot() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.PersistentFlags().String("format", "json", "")
 	root.PersistentFlags().StringP("output", "o", "", "")
 	return root
 }
@@ -68,7 +62,7 @@ func TestBuildCreatesCommands(t *testing.T) {
 	))
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json"}
+	flags := &stubFlags{}
 	Build(root, nil, flags)
 
 	resCmd, _, err := root.Find([]string{"connectors"})
@@ -102,7 +96,7 @@ func TestBuildOperationFlags(t *testing.T) {
 	Register(newMockResource("test", "Test resource", newMockOperation("execute")))
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json"}
+	flags := &stubFlags{}
 	Build(root, nil, flags)
 
 	cmd, _, _ := root.Find([]string{"test", "execute"})
@@ -161,7 +155,7 @@ func TestRunReturnsJSON(t *testing.T) {
 
 	tmpFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: tmpFile}
+	flags := &stubFlags{output: tmpFile}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"items", "list", "--json", "{}"})
@@ -210,7 +204,7 @@ func TestMissingRequiredParamReturnsValidationError(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json"}
+	flags := &stubFlags{}
 	Build(root, nil, flags)
 
 	root.SetArgs([]string{"things", "create", "--json", "{}"})
@@ -279,7 +273,7 @@ func TestFileInput(t *testing.T) {
 
 	outFile := filepath.Join(tmpDir, "out.json")
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: outFile}
+	flags := &stubFlags{output: outFile}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"things", "create", "--json", "@" + inputFile})
@@ -314,7 +308,7 @@ func TestIDFlag(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: outFile}
+	flags := &stubFlags{output: outFile}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"things", "get", "--id", "abc-123"})
@@ -355,7 +349,7 @@ func TestInteractiveHookOverridesRun(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: outFile}
+	flags := &stubFlags{output: outFile}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"auth", "login"})
@@ -400,7 +394,7 @@ func TestPreRunHookModifiesParams(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: outFile}
+	flags := &stubFlags{output: outFile}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"resources", "create", "--json", `{"name":"test"}`})
@@ -448,7 +442,7 @@ func TestPreRunHookError(t *testing.T) {
 	defer restore()
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json"}
+	flags := &stubFlags{}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"resources", "create"})
@@ -463,52 +457,6 @@ func TestPreRunHookError(t *testing.T) {
 	}
 	if *exitCode != client.ExitGeneral {
 		t.Errorf("expected exit code %d, got %d", client.ExitGeneral, *exitCode)
-	}
-}
-
-func TestTableOutput(t *testing.T) {
-	t.Cleanup(func() { Reset() })
-
-	Register(newMockResource("items", "Items",
-		Operation{
-			Name:        "list",
-			Description: "List items",
-			Schema: OperationSchema{
-				Params: map[string]ParamSchema{},
-			},
-			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-				return []map[string]string{
-					{"id": "1", "name": "alpha"},
-					{"id": "2", "name": "beta"},
-				}, nil
-			},
-		},
-	))
-
-	outFile := filepath.Join(t.TempDir(), "out.txt")
-	root := newTestRoot()
-	flags := &stubFlags{format: "table", output: outFile}
-	Build(root, stubClient(), flags)
-
-	root.SetArgs([]string{"items", "list", "--json", "{}"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	data, err := os.ReadFile(outFile)
-	if err != nil {
-		t.Fatalf("reading output file: %v", err)
-	}
-
-	content := string(data)
-	if !bytes.Contains([]byte(content), []byte("ID")) {
-		t.Errorf("expected table header 'ID' in output: %s", content)
-	}
-	if !bytes.Contains([]byte(content), []byte("NAME")) {
-		t.Errorf("expected table header 'NAME' in output: %s", content)
-	}
-	if !bytes.Contains([]byte(content), []byte("alpha")) {
-		t.Errorf("expected 'alpha' in output: %s", content)
 	}
 }
 
@@ -537,7 +485,7 @@ func TestNilClientReturnsAuthError(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	flags := &stubFlags{format: "json"}
+	flags := &stubFlags{}
 	Build(root, nil, flags)
 
 	root.SetArgs([]string{"items", "list", "--json", "{}"})
@@ -600,7 +548,7 @@ func TestParamFlagsString(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+	Build(root, stubClient(), &stubFlags{output: outFile})
 
 	root.SetArgs([]string{"things", "do", "--workspace", "prod", "--name", "thing-1"})
 	if err := root.Execute(); err != nil {
@@ -623,7 +571,7 @@ func TestParamFlagsTypeBindings(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+	Build(root, stubClient(), &stubFlags{output: outFile})
 
 	root.SetArgs([]string{
 		"things", "do",
@@ -658,7 +606,7 @@ func TestParamFlagsKebabCase(t *testing.T) {
 	registerMixedTypeOp(&captured)
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json", output: filepath.Join(t.TempDir(), "out.json")})
+	Build(root, stubClient(), &stubFlags{output: filepath.Join(t.TempDir(), "out.json")})
 
 	cmd, _, _ := root.Find([]string{"things", "do"})
 	if cmd.Flags().Lookup("dry-run") == nil {
@@ -679,7 +627,7 @@ func TestObjectParamRegistersAsJSONStringFlag(t *testing.T) {
 	registerMixedTypeOp(&captured)
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	cmd, _, _ := root.Find([]string{"things", "do"})
 	flag := cmd.Flags().Lookup("params")
@@ -702,7 +650,7 @@ func TestObjectParamUnmarshalsJSON(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json", output: outFile})
+	Build(root, stubClient(), &stubFlags{output: outFile})
 
 	root.SetArgs([]string{
 		"things", "do",
@@ -740,7 +688,7 @@ func TestObjectParamRejectsInvalidJSON(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	root.SetArgs([]string{
 		"things", "do",
@@ -791,7 +739,7 @@ func TestJSONAndParamFlagsConflict(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	root.SetArgs([]string{
 		"things", "do",
@@ -854,7 +802,7 @@ func TestFieldsFilterAppliedToOutput(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	flags := &stubFlags{format: "json", output: outFile, fields: []string{"data.id", "next"}}
+	flags := &stubFlags{output: outFile, fields: []string{"data.id", "next"}}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"items", "list"})
@@ -923,7 +871,7 @@ func TestFieldsFilterDoesNotApplyToErrors(t *testing.T) {
 
 	root := newTestRoot()
 	// fields filter that would, if applied, drop the error fields.
-	flags := &stubFlags{format: "json", fields: []string{"nonexistent"}}
+	flags := &stubFlags{fields: []string{"nonexistent"}}
 	Build(root, stubClient(), flags)
 
 	root.SetArgs([]string{"items", "fail"})
@@ -968,7 +916,7 @@ func TestParamFlagsMissingRequired(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	// `workspace` is required but not provided via any mode.
 	root.SetArgs([]string{"things", "do", "--name", "thing-1"})
@@ -1000,7 +948,7 @@ func TestJSONUnknownParamReturnsValidationError(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 	root.SetArgs([]string{"things", "do", "--json", `{"workspace":"prod","extra":"bad"}`})
 
 	func() {
@@ -1048,7 +996,7 @@ func TestJSONWrongTypeReturnsValidationError(t *testing.T) {
 	os.Stderr = w
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 	root.SetArgs([]string{"things", "do", "--json", `{"workspace":"prod","limit":"42"}`})
 
 	func() {
@@ -1105,7 +1053,7 @@ func TestInteractiveHookRequiresAuthByDefault(t *testing.T) {
 	defer restore()
 
 	root := newTestRoot()
-	Build(root, nil, &stubFlags{format: "json"})
+	Build(root, nil, &stubFlags{})
 	root.SetArgs([]string{"connectors", "create"})
 
 	func() {
@@ -1143,7 +1091,7 @@ func TestInteractiveHookCanAllowUnauthenticated(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "out.json")
 	root := newTestRoot()
-	Build(root, nil, &stubFlags{format: "json", output: outFile})
+	Build(root, nil, &stubFlags{output: outFile})
 	root.SetArgs([]string{"auth", "login"})
 
 	if err := root.Execute(); err != nil {
@@ -1176,7 +1124,7 @@ func TestParamFlagCollisionReturnsValidationError(t *testing.T) {
 	defer restore()
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 	root.SetArgs([]string{"things", "do"})
 
 	func() {
@@ -1212,7 +1160,7 @@ func TestParamFlagDuplicateNameReturnsValidationError(t *testing.T) {
 	defer restore()
 
 	root := newTestRoot()
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 	root.SetArgs([]string{"things", "do"})
 
 	func() {
