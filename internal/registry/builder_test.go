@@ -513,6 +513,13 @@ func TestNilClientReturnsAuthError(t *testing.T) {
 	if result["type"] != "auth_error" {
 		t.Errorf("expected type 'auth_error', got %v", result["type"])
 	}
+
+	hint, _ := result["hint"].(string)
+	for _, want := range []string{"airbyte-agent login", "AIRBYTE_CLIENT_ID", "AIRBYTE_CLIENT_SECRET", "AIRBYTE_ORGANIZATION_ID", "~/.airbyte-agent/settings.json"} {
+		if !strings.Contains(hint, want) {
+			t.Errorf("expected hint to mention %q; got %q", want, hint)
+		}
+	}
 }
 
 // registerMixedTypeOp registers a mock operation with one parameter of each

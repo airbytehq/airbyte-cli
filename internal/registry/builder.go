@@ -178,8 +178,9 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 			if c == nil && !op.Hooks.AllowUnauthenticated {
 				return handleRunError(&client.APIError{
 					Type:       "auth_error",
-					Message:    "no credentials configured: set AIRBYTE_CLIENT_ID and AIRBYTE_CLIENT_SECRET environment variables, or create ~/.airbyte-agent/credentials",
+					Message:    "no credentials configured",
 					StatusCode: 401,
+					Hint:       "run 'airbyte-agent login' to configure credentials interactively, set AIRBYTE_CLIENT_ID/AIRBYTE_CLIENT_SECRET/AIRBYTE_ORGANIZATION_ID environment variables, or populate ~/.airbyte-agent/settings.json",
 				})
 			}
 
