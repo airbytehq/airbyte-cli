@@ -10,10 +10,10 @@ See [`AGENTS.md`](AGENTS.md) for the full architecture reference and [`CONTEXT.m
 
 ### Quick install (macOS, Linux, WSL)
 
-Install the CLI **and** the agent skills.
+The fastest way to install the CLI **and** the agent skills.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/airbytehq/airbyte-agent-cli/main/scripts/install.sh | bash
+curl -fsSL https://airbyte.ai/install.sh | bash
 ```
 
 Environment overrides:
