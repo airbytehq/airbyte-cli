@@ -2,7 +2,7 @@
 # Install the airbyte-agent CLI and its agent skills.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/airbytehq/airbyte-agent-cli/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/airbytehq/airbyte-agent-cli/main/scripts/install.sh | bash
 #
 # Environment overrides:
 #   AIRBYTE_AGENT_VERSION       Install a specific tag (e.g. v0.2.0). Default: latest release.

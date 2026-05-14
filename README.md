@@ -13,7 +13,7 @@ See [`AGENTS.md`](AGENTS.md) for the full architecture reference and [`CONTEXT.m
 Install the CLI **and** the agent skills.
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/airbytehq/airbyte-agent-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/airbytehq/airbyte-agent-cli/main/scripts/install.sh | bash
 ```
 
 Environment overrides:
