@@ -5,10 +5,10 @@ This document tells AI agents how to use the `airbyte-agent` CLI. For developmen
 ## Rules of Engagement
 
 > [!IMPORTANT]
-> **Schema Discovery**: If you don't know the exact JSON payload structure for a command, run it with `--describe` first. This returns the parameter schema without executing the operation.
+> **Schema Discovery**: If you don't know the exact JSON payload structure for a command, run `airbyte-agent schema <resource> <operation>` first. This returns the parameter schema without executing the operation.
 
 > [!IMPORTANT]
-> **Always filter responses to the fields you need.** Whenever you know which fields will satisfy the user's request, pass `--fields` to trim the output. This applies to **every command** — list, describe, execute, etc. Unfiltered responses waste context window and bandwidth on data you will discard anyway. The only time to skip the filter is when you genuinely need the full payload (e.g. one-shot debugging, or you don't yet know which fields exist — in which case run `--describe` or do a small probe call first).
+> **Always filter responses to the fields you need.** Whenever you know which fields will satisfy the user's request, pass `--fields` to trim the output. This applies to **every command** — list, describe, execute, etc. Unfiltered responses waste context window and bandwidth on data you will discard anyway. The only time to skip the filter is when you genuinely need the full payload (e.g. one-shot debugging, or you don't yet know which fields exist — in which case run `airbyte-agent schema <resource> <operation>` or do a small probe call first).
 >
 > For row-level reads via `connectors execute`, also pass `select_fields` (API-side) to reduce upstream work. `select_fields` and `--fields` are complementary: the first stops the source connector from emitting columns you don't need; the second trims what the CLI prints to stdout.
 
@@ -24,9 +24,9 @@ airbyte-agent <resource> <operation> [flags]
 All parameters are passed via `--json '<JSON>'` or `--id '<ID>'`. Output goes to stdout as JSON (default) or table format.
 
 ```bash
-airbyte-agent --help                        # List all resources
-airbyte-agent <resource> --help             # List operations for a resource
-airbyte-agent <resource> <operation> --describe  # Show parameter schema
+airbyte-agent --help                              # List all resources
+airbyte-agent <resource> --help                   # List operations for a resource
+airbyte-agent schema <resource> <operation>       # Show parameter schema (CLI + OpenAPI)
 ```
 
 ### Key Flags
@@ -36,7 +36,6 @@ airbyte-agent <resource> <operation> --describe  # Show parameter schema
 | `--json` | Inline JSON parameters | -- |
 | `--id` | Convenience flag for resource ID | -- |
 | `--format` | Output format: `json` or `table` | `json` |
-| `--describe` | Print operation schema and exit (do not execute) | `false` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--fields` | Filter response to listed fields (comma-separated dotted paths, e.g. `data.id,data.name`). Client-side; not applied to errors. | -- |
@@ -133,10 +132,10 @@ Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` 
 
 ### 6. Schema Introspection
 
-Use `--describe` on any command to see its parameter schema before calling it:
+Use the top-level `schema` command to see an operation's parameter schema (and underlying OpenAPI request/response) before calling it:
 
 ```bash
-airbyte-agent connectors execute --describe
+airbyte-agent schema connectors execute
 # Returns:
 # {
 #   "description": "Execute an action on a connector",
@@ -147,7 +146,8 @@ airbyte-agent connectors execute --describe
 #     "entity": {"type": "string", "required": true, "description": "Entity name"},
 #     "action": {"type": "string", "required": true, "description": "Action name"},
 #     ...
-#   }
+#   },
+#   "api": { "path": "...", "method": "POST", "request_body": {...}, "response": {...} }
 # }
 ```
 
@@ -196,13 +196,13 @@ API errors (400/422) include the full server response in `detail`:
 }
 ```
 
-When you see a validation error for missing parameters, use `--describe` to check the schema:
+When you see a validation error for missing parameters, run `airbyte-agent schema <resource> <operation>` to check the schema:
 
 ```json
 {
   "type": "validation_error",
   "message": "missing required parameters: entity, action",
   "status_code": 400,
-  "hint": "run this command with --describe to see the expected parameter schema"
+  "hint": "run `airbyte-agent schema <resource> <operation>` to see the expected parameter schema"
 }
 ```

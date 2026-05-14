@@ -17,9 +17,8 @@ var schemaCmd = &cobra.Command{
 when an OpenAPI mapping is declared, the API route's parameters, request body,
 and response schema.
 
-This is equivalent to running '<resource> <operation> --describe' but is
-discoverable as a top-level command. Use it when you want agents to find the
-introspection surface without knowing every resource name.`,
+Use it when you want agents to find the introspection surface for an operation
+without making an API call.`,
 	Args:          cobra.ExactArgs(2),
 	SilenceUsage:  true,
 	SilenceErrors: true,
