@@ -1,6 +1,7 @@
 package browserlogin
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -257,6 +258,59 @@ func TestBuildAuthorizeURL(t *testing.T) {
 		if got := q.Get(k); got != want {
 			t.Errorf("query %s = %q, want %q", k, got, want)
 		}
+	}
+}
+
+// TestRunOAuthFlow_OpenBrowserFailureSurfacesURL asserts that when the browser
+// launcher itself fails we print the authorize URL on stderr (so the user can
+// paste it manually) and still wait on the loopback. This was a silent failure
+// in the first cut — three-minute hang ending in "context deadline exceeded".
+func TestRunOAuthFlow_OpenBrowserFailureSurfacesURL(t *testing.T) {
+	t.Parallel()
+
+	keycloak := fakeKeycloak(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"at","token_type":"Bearer","expires_in":60}`))
+	})
+	defer keycloak.Close()
+
+	var capturedURL string
+	openFunc := func(authURL string) error {
+		capturedURL = authURL
+		// Simulate "open" failing (binary missing, headless, etc.) but ALSO
+		// drive the loopback so the test doesn't hit the 3-minute timeout —
+		// in production the user would paste the URL into another browser.
+		go func() {
+			u, _ := url.Parse(authURL)
+			q := u.Query()
+			cb := q.Get("redirect_uri") + "?code=ok&state=" + q.Get("state")
+			_, _ = http.Get(cb)
+		}()
+		return errors.New("exec: \"open\": executable file not found in $PATH")
+	}
+
+	var stderr bytes.Buffer
+	tokens, err := RunOAuthFlow(context.Background(), &Options{
+		KeycloakBase: keycloak.URL,
+		ClientID:     "test-client",
+		Timeout:      5 * time.Second,
+		OpenFunc:     openFunc,
+		HTTPClient:   keycloak.Client(),
+		Stderr:       &stderr,
+	})
+	if err != nil {
+		t.Fatalf("RunOAuthFlow: %v", err)
+	}
+	if tokens.AccessToken != "at" {
+		t.Errorf("AccessToken = %q, want at", tokens.AccessToken)
+	}
+
+	got := stderr.String()
+	if !strings.Contains(got, "could not auto-open browser") {
+		t.Errorf("stderr missing diagnostic message; got %q", got)
+	}
+	if !strings.Contains(got, capturedURL) {
+		t.Errorf("stderr missing authorize URL; got %q (want substring %q)", got, capturedURL)
 	}
 }
 

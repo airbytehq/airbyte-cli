@@ -177,6 +177,7 @@ func runBrowserLogin(ctx context.Context, p loginParams) (*auth.Settings, error)
 
 	tokens, err := browserlogin.RunOAuthFlow(ctx, &browserlogin.Options{
 		KeycloakBase: keycloakBase,
+		Stderr:       p.stderr,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("browser login: %w", err)

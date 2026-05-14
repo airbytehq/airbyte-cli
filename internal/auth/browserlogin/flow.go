@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -49,6 +50,9 @@ type Options struct {
 	// Tests use this to point at an httptest.Server; nil means a default
 	// client whose Timeout matches Options.timeout().
 	HTTPClient *http.Client
+	// Stderr receives user-facing messages emitted by the flow (currently only
+	// the "couldn't open browser" fallback). nil → os.Stderr.
+	Stderr io.Writer
 }
 
 func (o *Options) keycloakBase() string {
@@ -91,6 +95,13 @@ func (o *Options) httpClient() *http.Client {
 		return o.HTTPClient
 	}
 	return &http.Client{Timeout: o.timeout()}
+}
+
+func (o *Options) stderr() io.Writer {
+	if o != nil && o.Stderr != nil {
+		return o.Stderr
+	}
+	return os.Stderr
 }
 
 // tokenResponse mirrors the Keycloak OIDC token-endpoint JSON. The Error and
@@ -137,10 +148,15 @@ func RunOAuthFlow(ctx context.Context, opts *Options) (*Tokens, error) {
 		opts.scopes(), state, challenge,
 	)
 
-	// Fire-and-forget the browser open. If it fails (no browser binary, headless
-	// machine, etc.) we still wait on the loopback — the user can paste the URL
-	// manually. Phase 4 will surface a friendlier message at the cmd layer.
-	_ = opts.openFunc()(authorizeURL)
+	// If the browser launcher itself fails (no browser binary, headless machine,
+	// etc.) we still wait on the loopback so the user can paste the URL manually,
+	// but we surface the failure and print the URL so they know what to do
+	// instead of staring at a frozen terminal for three minutes.
+	if err := opts.openFunc()(authorizeURL); err != nil {
+		fmt.Fprintf(opts.stderr(),
+			"could not auto-open browser (%v).\nPaste this URL manually:\n  %s\n",
+			err, authorizeURL)
+	}
 
 	code, returnedState, err := lb.Wait(flowCtx)
 	if err != nil {

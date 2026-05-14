@@ -166,11 +166,13 @@ func Bootstrap(ctx context.Context, opts *BootstrapOptions) (*BootstrapResult, e
 					"complete onboarding at https://app.airbyte.ai, then re-run airbyte-agent login",
 				)
 			}
-			// 400 "specify target organization" → defensive fallback (we already
-			// resolved an orgID above, so this shouldn't happen — surface as-is).
+			// 400 "specify target organization" — we already resolved an
+			// orgID and put it in the X-Organization-Id header, so seeing
+			// this means the server disagreed. Wrap so the user understands
+			// they aren't missing a flag.
 			if apiErr.StatusCode == http.StatusBadRequest &&
 				strings.Contains(strings.ToLower(apiErr.Message), "specify target organization") {
-				return nil, err
+				return nil, fmt.Errorf("server demanded an organization header even though one was supplied (org-id=%s): %w", chosenOrgID, err)
 			}
 		}
 		return nil, err
