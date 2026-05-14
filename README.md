@@ -8,6 +8,23 @@ See [`AGENTS.md`](AGENTS.md) for the full architecture reference and [`CONTEXT.m
 
 ## Install
 
+### Quick install (macOS, Linux, WSL)
+
+The fastest way to install the CLI **and** the agent skills.
+
+```bash
+curl -fsSL https://airbyte.ai/install.sh | bash
+```
+
+Environment overrides:
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `AIRBYTE_AGENT_VERSION` | Install a specific tag (e.g. `v0.2.0`) | latest release |
+| `AIRBYTE_AGENT_INSTALL_DIR` | CLI target directory | `/usr/local/bin` if writable, else `~/.local/bin` |
+| `AIRBYTE_AGENT_SKILLS_DIR` | Skills target directory | `~/.claude/skills` |
+| `AIRBYTE_AGENT_SKIP_SKILLS` | Set to `1` to install only the CLI | unset |
+
 ### Homebrew (macOS, Linux)
 
 ```bash
