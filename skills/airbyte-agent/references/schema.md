@@ -1,18 +1,12 @@
----
-name: schema
-description: Print the merged CLI + OpenAPI schema (request, response, parameters) for any operation.
-command: airbyte-agent schema
----
-
 # schema
-
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
 Return the full machine-readable schema for an operation: the CLI-level parameter shape **and** the underlying OpenAPI route's parameters, request body, and response.
 
 > [!IMPORTANT]
 > Run `airbyte-agent schema <resource> <operation>` **before** writing code or scripts that consume an operation's output. The `api.response` schema tells you exactly what fields will come back so you can pass `--fields` correctly the first time.
+
+> [!NOTE]
+> `schema` takes positional arguments, not a `--json` payload — it is an introspection command, not an API call.
 
 ## Usage
 

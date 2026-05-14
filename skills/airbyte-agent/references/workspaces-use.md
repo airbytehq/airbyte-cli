@@ -1,18 +1,6 @@
----
-name: workspaces-use
-description: Set the default workspace stored in ~/.airbyte-agent/settings.json. Subsequent commands use this workspace when one isn't explicitly passed.
-command: airbyte-agent workspaces use
----
-
 # workspaces use
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
 Persist a default workspace name to `~/.airbyte-agent/settings.json`. After running this, any command that takes a `workspace` parameter and doesn't receive one will fall back to this value (in place of the literal `"default"`).
-
-> [!IMPORTANT]
-> Always pass parameters as `--json '{...}'`. Agents should not use per-parameter flags.
 
 > [!NOTE]
 > The command verifies the workspace exists via the API before writing. The canonical-cased name from the API is what gets persisted (so typing `production` will save `Production` if that's how it's stored).

@@ -1,27 +1,9 @@
----
-name: connectors-execute
-description: Run an action (list/get/search/create/update) against an entity on a connector. The workhorse command — read this skill before calling.
-command: airbyte-agent connectors execute
----
-
 # connectors execute
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
-Run an action against an entity on a connector — the workhorse command for actually moving data. This skill embeds the SDK-level knowledge of how the underlying API behaves (filter operators, pagination, response shape, field-selection rules). For *connector-specific* details — which entities exist, which actions they support, and which params they take — call `connectors describe` first; never guess.
+Run an action against an entity on a connector — the workhorse command for actually moving data. This reference embeds the SDK-level knowledge of how the underlying API behaves (filter operators, pagination, response shape, field-selection rules).
 
 > [!IMPORTANT]
-> **Always pass parameters as `--json '{...}'`.** The CLI also exposes per-parameter flags (`--workspace`, `--name`, etc.) for human use, but agents should always send a single JSON payload. The two modes are mutually exclusive and JSON keeps your input self-describing for review and replay.
-
-> [!IMPORTANT]
-> **Field selection is MANDATORY.** Every call MUST include `select_fields` (allowlist) or `exclude_fields` (blocklist). Unfiltered responses waste both bandwidth and context window. Both support dot-notation for nested fields (e.g. `billing.address.city`). If both are passed, `select_fields` wins.
-
-> [!IMPORTANT]
-> **Prefer `context_store_search` over `list`.** The default action for any read is `context_store_search` — it supports filtering, sorting, and pagination. Only use `list` when (a) you need today's data (the search index can lag hours), or (b) `context_store_search` returns no results and you suspect indexing delay.
-
-> [!IMPORTANT]
-> **`connectors describe` is the source of truth for what a specific connector supports.** Use it to discover the **entities** the connector exposes, the **actions** valid on each entity, and the **params** each action accepts (filter fields, required arguments, response shape). Do NOT guess any of these — every guess is an avoidable round-trip. The action table below is a *baseline* (most connectors support most of these), but the actually-supported set is what `describe` reports.
+> **`connectors describe` is the source of truth for what a specific connector supports.** Use it to discover the **entities** the connector exposes, the **actions** valid on each entity, and the **params** each action accepts (filter fields, required arguments, response shape). Do NOT guess any of these — every guess is an avoidable round-trip. The action table below is a *baseline* (most connectors support most of these), but the actually-supported set is what `describe` reports. **Read [`connectors-describe.md`](connectors-describe.md) before running `execute` against an unfamiliar connector.**
 
 ## Usage
 
@@ -53,7 +35,7 @@ Most connectors expose these actions, but the authoritative list for a given con
 
 ## Discovering entities, actions, and params with `connectors describe`
 
-Before guessing what to put in the `entity` / `action` / `params` fields, run `connectors describe` against the connector. Its output is the contract — it lists every entity the connector supports, every action valid on each entity, and the param schema each action accepts.
+Before guessing what to put in the `entity` / `action` / `params` fields, run `connectors describe` against the connector. Its output is the contract — it lists every entity the connector supports, every action valid on each entity, and the param schema each action accepts. See [`connectors-describe.md`](connectors-describe.md) for the full describe playbook.
 
 ```bash
 airbyte-agent connectors describe --json '{"workspace": "default", "name": "hubspot"}'
@@ -196,7 +178,7 @@ Always resolve relative date phrases ("today", "yesterday", "this week") to **ex
 
 Two complementary mechanisms — use **both** when you know the fields you need:
 
-- **`select_fields` / `exclude_fields` (API-side, inside the JSON payload)** — passed to the source connector to reduce upstream work and bandwidth. Dot-notation for nested fields supported.
+- **`select_fields` / `exclude_fields` (API-side, inside the JSON payload)** — passed to the source connector to reduce upstream work and bandwidth. Dot-notation for nested fields supported. If both are passed, `select_fields` wins.
 - **`--fields` (CLI-side, global flag)** — shapes the JSON the CLI prints to stdout, after the API responds.
 
 ```bash
@@ -236,4 +218,3 @@ airbyte-agent connectors execute --fields data.id,data.email,meta.has_more --jso
 - Do NOT paginate beyond 3 pages — narrow the filter instead.
 - Do NOT pass relative dates ("today", "last week") — resolve to absolute ISO 8601 timestamps and report the range to the user.
 - Do NOT silently retry write failures against a different target.
-- Do NOT use the per-flag form (`--workspace`, `--name`, `--params`) in agent invocations — pass a single `--json` payload instead.
