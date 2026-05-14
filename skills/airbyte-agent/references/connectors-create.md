@@ -1,18 +1,6 @@
----
-name: connectors-create
-description: Install a new connector via the secure browser-based credential flow.
-command: airbyte-agent connectors create
----
-
 # connectors create
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
 Install a new connector from a template. Opens the user's browser for secure credential entry, polls until credentials are submitted, and creates the connector.
-
-> [!IMPORTANT]
-> Always pass parameters as `--json '{...}'`. Agents should not use per-parameter flags.
 
 > [!IMPORTANT]
 > **Never accept credentials directly.** This command exists so you do NOT have to. Do not ask the user for API keys, tokens, passwords, or secrets. If a user offers credentials, decline and start this flow instead.

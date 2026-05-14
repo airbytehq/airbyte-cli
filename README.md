@@ -53,20 +53,17 @@ go build -o airbyte-agent .
 
 ## Skills
 
-Per-command agent skill documents live under `skills/<command>/SKILL.md`, each with YAML frontmatter (`name`, `description`, `command`) and task-oriented guidance. They are designed to be consumed by agent harnesses (e.g. Claude Code).
+The repo ships a single agent skill, `skills/airbyte-agent/`, that bundles per-command playbooks under `skills/airbyte-agent/references/<command>.md`. The top-level `SKILL.md` carries cross-command rules (`--json` payload format, `--fields` filtering, auth recovery, `connectors describe` before `execute`) and a routing table the agent uses to open the matching reference for the task at hand. This follows the [Agent Skills spec](https://agentskills.io/specification) for progressive disclosure: only the small `SKILL.md` is loaded on activation, and per-command references are opened on demand.
 
-The skills work alongside the CLI — they tell the agent *how* to invoke each command, while the `airbyte-agent` binary does the actual work. Install the CLI first, then install the skills into your agent.
+The skill works alongside the CLI — it tells the agent *how* to invoke each command, while the `airbyte-agent` binary does the actual work. Install the CLI first, then install the skill into your agent.
 
 ### Install via `npx skills`
 
-The [`skills`](https://github.com/vercel-labs/skills) installer discovers the `skills/` directory in this repo and wires each `SKILL.md` into your agent (Claude Code, etc.):
+The [`skills`](https://github.com/vercel-labs/skills) installer discovers the `skills/` directory in this repo and wires `SKILL.md` (with its `references/` subdirectory) into your agent (Claude Code, etc.):
 
 ```bash
-# Install all skills
+# Install the skill
 npx skills add airbytehq/airbyte-agent-cli
-
-# Install one skill
-npx skills add airbytehq/airbyte-agent-cli --skill connectors-execute
 
 # Preview without installing
 npx skills add airbytehq/airbyte-agent-cli --list
@@ -79,7 +76,7 @@ Target a specific agent with `--agent claude-code` (or another supported agent).
 
 ### Manual install
 
-Copy or symlink `skills/<command>/` into your agent's skill directory directly (e.g. `~/.claude/skills/` for Claude Code).
+Copy or symlink `skills/airbyte-agent/` into your agent's skill directory directly (e.g. `~/.claude/skills/airbyte-agent/` for Claude Code). The `references/` subdirectory must be preserved alongside `SKILL.md` — the umbrella skill points at it on demand.
 
 ## Configure
 

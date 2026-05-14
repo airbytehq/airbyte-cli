@@ -1,18 +1,6 @@
----
-name: connectors-delete
-description: Permanently delete a connector from a workspace.
-command: airbyte-agent connectors delete
----
-
 # connectors delete
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
 Permanently delete a connector from a workspace.
-
-> [!IMPORTANT]
-> Always pass parameters as `--json '{...}'`. Agents should not use per-parameter flags.
 
 > [!IMPORTANT]
 > Deletion is irreversible. Confirm with the user before running this command unless they have explicitly authorized it.

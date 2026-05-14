@@ -1,18 +1,6 @@
----
-name: organizations-list
-description: List organizations the authenticated user belongs to.
-command: airbyte-agent organizations list
----
-
 # organizations list
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
 List the organizations that the authenticated principal has access to.
-
-> [!IMPORTANT]
-> Always pass parameters as `--json '{...}'` (even when the payload is empty: `--json '{}'`). Agents should not use per-parameter flags.
 
 ## Usage
 
@@ -22,19 +10,11 @@ airbyte-agent organizations list --json '{}'
 
 ## Filtering output
 
-> [!IMPORTANT]
-> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
-
-Use the global `--fields` flag to trim the response to specific fields. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
-
 ```bash
 airbyte-agent organizations list --fields id,organization_name --json '{}'              # short form
 airbyte-agent organizations list --fields data.id,data.organization_name --json '{}'    # long form
-```
 
-If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
-
-```bash
+# Mixed top-level and row-level paths — use the long form for the row paths
 airbyte-agent organizations list --fields data.id,next --json '{}'
 ```
 

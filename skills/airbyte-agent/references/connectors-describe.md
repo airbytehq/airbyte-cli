@@ -1,18 +1,6 @@
----
-name: connectors-describe
-description: Inspect a connector's entities and actions. Always run before the first `execute`.
-command: airbyte-agent connectors describe
----
-
 # connectors describe
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
-Show a connector's available entities (e.g. `users`, `contacts`, `orders`) and the actions supported on each (e.g. `read`, `write`).
-
-> [!IMPORTANT]
-> Always pass parameters as `--json '{...}'`. Agents should not use per-parameter flags.
+Show a connector's available entities (e.g. `users`, `contacts`, `orders`) and the actions supported on each (e.g. `read`, `write`). This is the contract every `connectors execute` call should be planned against.
 
 > [!IMPORTANT]
 > **Always describe before execute.** Entity and action names vary by connector type and are not predictable. Do NOT guess them.
@@ -55,6 +43,8 @@ airbyte-agent connectors execute --json '{
   "select_fields": ["id", "email"]
 }'
 ```
+
+Once you have the describe output, open [`connectors-execute.md`](connectors-execute.md) before composing the `execute` call — it covers field selection, filter operators, pagination, and write-action rules that aren't repeated here.
 
 ## Do NOT
 

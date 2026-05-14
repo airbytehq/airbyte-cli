@@ -1,18 +1,6 @@
----
-name: connectors-list
-description: List connectors configured in a workspace.
-command: airbyte-agent connectors list
----
-
 # connectors list
 
-> [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
-
 List the connectors that already exist in a given workspace.
-
-> [!IMPORTANT]
-> Always pass parameters as `--json '{...}'`. Per-parameter flags exist for human use; agents should use a single JSON payload for predictable, reviewable inputs.
 
 ## Usage
 
@@ -33,19 +21,11 @@ airbyte-agent connectors list --json '{}'
 
 ## Filtering output
 
-> [!IMPORTANT]
-> When you already know which fields you need, **always pass `--fields`**. Unfiltered list responses waste context window on data you will discard.
-
-Use the global `--fields` flag to trim the response. Both forms work because list responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths:
-
 ```bash
 airbyte-agent connectors list --fields id,name --json '{}'              # short form
 airbyte-agent connectors list --fields data.id,data.name --json '{}'    # long form
-```
 
-If you mix top-level and row-level paths (e.g. include the cursor), use the long form for the row-level fields:
-
-```bash
+# Mixed top-level and row-level paths — use the long form for the row paths
 airbyte-agent connectors list --fields data.id,next --json '{}'
 ```
 
