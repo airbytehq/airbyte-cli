@@ -2,92 +2,100 @@ package cmd
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agent-cli/internal/auth/browserlogin"
 	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/config"
 	outputpkg "github.com/airbytehq/airbyte-agent-cli/internal/output"
 	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
 
+var (
+	loginManualFlag bool
+	loginOrgIDFlag  string
+)
+
+// loginParams holds the values consumed by the login runners so the
+// browser/manual entry points can be unit-tested without going through
+// Cobra (which calls os.Exit deep in the failure branches).
+type loginParams struct {
+	manual     bool
+	orgID      string
+	in         io.Reader
+	out        io.Writer
+	stderr     io.Writer
+	stdinIsTTY bool
+}
+
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Configure credentials and organization id interactively",
-	Long: `Prompt for client_id, client_secret, organization_id, and a default
-workspace, then save them to ~/.airbyte-agent/settings.json with 0600 permissions.
-Run this once on a new machine or whenever your credentials change.
+	Short: "Sign in to airbyte.ai and save credentials locally",
+	Long: `Sign in to airbyte.ai. By default this opens your browser to complete
+the Keycloak login, then bootstraps your client_id, client_secret, and
+organization_id from the airbyte.ai bootstrap endpoints and writes them to
+~/.airbyte-agent/settings.json with 0600 permissions.
+
+Use --manual for the legacy prompt-based flow (useful when no browser is
+available, e.g. on a headless server). Use --org-id <uuid> to skip the
+multi-organization picker when you belong to more than one organization.
 
 The workspace is used as the fallback for any command that takes a
-'workspace' parameter when one isn't supplied. Press Enter to accept
-'default'.`,
+'workspace' parameter when one isn't supplied. The browser flow does not
+prompt for a workspace; if you need to change yours, edit
+~/.airbyte-agent/settings.json directly or use 'workspaces use'.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
-		reader := bufio.NewReader(os.Stdin)
-
-		fmt.Fprintln(os.Stderr, "Find your Client ID, Client Secret, and Organization ID at Settings -> Profile in the airbyte.ai app")
-
-		clientID, err := promptRequired(reader, "Client ID")
-		if err != nil {
-			return err
-		}
-		clientSecret, err := promptSecret(reader, "Client Secret")
-		if err != nil {
-			return err
-		}
-		orgID, err := promptRequired(reader, "Organization ID")
-		if err != nil {
-			return err
-		}
-		workspace, err := promptWithDefault(reader, "Workspace", "default")
-		if err != nil {
-			return err
+		ctx := cmd.Context()
+		if ctx == nil {
+			ctx = context.Background()
 		}
 
-		// Preserve telemetry / internal-user values from any prior
-		// settings file so re-running login doesn't reset what the
-		// user previously set. Missing file → use the documented
-		// defaults (telemetry on, internal off).
-		telemetryEnabled := true
-		isInternalUser := false
-		if existing, rerr := auth.ReadSettingsFile(); rerr == nil {
-			telemetryEnabled = existing.TelemetryEnabled
-			isInternalUser = existing.IsInternalUser
+		p := loginParams{
+			manual:     loginManualFlag,
+			orgID:      loginOrgIDFlag,
+			in:         os.Stdin,
+			out:        os.Stdout,
+			stderr:     os.Stderr,
+			stdinIsTTY: stdinIsTTY(),
 		}
 
-		settings := &auth.Settings{
-			Credentials: auth.Credentials{
-				ClientID:     clientID,
-				ClientSecret: clientSecret,
-			},
-			OrganizationID:   orgID,
-			Workspace:        workspace,
-			TelemetryEnabled: telemetryEnabled,
-			IsInternalUser:   isInternalUser,
+		var (
+			fresh *auth.Settings
+			err   error
+		)
+		if p.manual {
+			fresh, err = runManualLogin(ctx, p)
+		} else {
+			fresh, err = runBrowserLogin(ctx, p)
 		}
-		if err := auth.WriteSettingsFile(settings); err != nil {
+		if err != nil {
+			emitLoginTelemetry(start, "", false, classifyError(err))
 			outputpkg.WriteError(map[string]any{"type": "error", "message": err.Error()})
-			os.Exit(1)
+			os.Exit(exitCodeFor(err))
 		}
 
-		// Emit the login event with the just-entered org_id. We
-		// can't reuse the global tracker (built before settings.json
-		// existed for a fresh install), so spin up a one-shot tracker
-		// here and flush it before returning.
-		mode := telemetry.ResolveMode(settings.TelemetryEnabled)
-		t := telemetry.New(mode, settings.OrganizationID, Version, settings.IsInternalUser)
-		t.TrackCommand(telemetry.CommandEvent{
-			Command:    "login",
-			Success:    true,
-			DurationMs: time.Since(start).Milliseconds(),
-		})
-		t.Flush()
+		existing, _ := auth.ReadSettingsFile() // nil when the file doesn't exist
+		merged := mergePreservedSettings(existing, fresh)
+		fmt.Fprintln(os.Stderr, "Saving credentials to ~/.airbyte-agent/settings.json…")
+		if werr := auth.WriteSettingsFile(merged); werr != nil {
+			emitLoginTelemetry(start, merged.OrganizationID, false, "write_settings")
+			outputpkg.WriteError(map[string]any{"type": "error", "message": werr.Error()})
+			os.Exit(client.ExitGeneral)
+		}
+
+		emitLoginTelemetry(start, merged.OrganizationID, true, "")
 
 		return outputpkg.WriteJSON(os.Stdout, map[string]string{
 			"status":  "saved",
@@ -148,7 +156,188 @@ func obfuscateSecret(s string) string {
 
 func init() {
 	loginCmd.AddCommand(loginShowCmd)
+	loginCmd.Flags().BoolVar(&loginManualFlag, "manual", false, "Use the legacy prompt-based flow instead of the browser")
+	loginCmd.Flags().StringVar(&loginOrgIDFlag, "org-id", "", "Skip the multi-org picker by specifying the organization UUID")
 	rootCmd.AddCommand(loginCmd)
+}
+
+// runBrowserLogin opens the user's browser to Keycloak, exchanges the
+// authorization code for a Keycloak access token, then calls the sonar
+// bootstrap endpoints to retrieve (client_id, client_secret,
+// organization_id). The returned Settings is NOT merged with anything on
+// disk — the caller does that via mergePreservedSettings.
+func runBrowserLogin(ctx context.Context, p loginParams) (*auth.Settings, error) {
+	fmt.Fprintln(p.stderr, "Opening your browser to log in at app.airbyte.ai…")
+	fmt.Fprintln(p.stderr, "If the browser doesn't open, run `airbyte-agent login --manual`.")
+
+	keycloakBase := os.Getenv("AIRBYTE_KEYCLOAK_URL")
+	if keycloakBase == "" {
+		keycloakBase = browserlogin.DefaultKeycloakBase
+	}
+
+	tokens, err := browserlogin.RunOAuthFlow(ctx, &browserlogin.Options{
+		KeycloakBase: keycloakBase,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("browser login: %w", err)
+	}
+	fmt.Fprintln(p.stderr, "Login successful.")
+	fmt.Fprintln(p.stderr, "Obtaining credentials from airbyte.ai…")
+
+	apiHost := config.Load().APIHost
+	result, err := browserlogin.Bootstrap(ctx, &browserlogin.BootstrapOptions{
+		APIHost:       apiHost,
+		AccessToken:   tokens.AccessToken,
+		OrgIDOverride: p.orgID,
+		Stdin:         p.in,
+		Stderr:        p.stderr,
+		StdinIsTTY:    p.stdinIsTTY,
+		CLIVersion:    Version,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &auth.Settings{
+		Credentials: auth.Credentials{
+			ClientID:     result.ClientID,
+			ClientSecret: result.ClientSecret,
+		},
+		OrganizationID: result.OrganizationID,
+		// Workspace intentionally empty — mergePreservedSettings carries
+		// forward the existing value or falls back to "default".
+	}, nil
+}
+
+// runManualLogin is the legacy prompt-driven flow. Refactored out of the
+// previous loginCmd.RunE body so the browser path can replace it as the
+// default.
+func runManualLogin(ctx context.Context, p loginParams) (*auth.Settings, error) {
+	_ = ctx // current prompt helpers are blocking; ctx threading is a follow-up.
+	fmt.Fprintln(p.stderr, "Find your Client ID, Client Secret, and Organization ID at Settings -> Profile in the airbyte.ai app")
+	reader := bufio.NewReader(p.in)
+
+	clientID, err := promptRequired(reader, "Client ID")
+	if err != nil {
+		return nil, err
+	}
+	clientSecret, err := promptSecret(reader, "Client Secret")
+	if err != nil {
+		return nil, err
+	}
+	orgID, err := promptRequired(reader, "Organization ID")
+	if err != nil {
+		return nil, err
+	}
+	workspace, err := promptWithDefault(reader, "Workspace", "default")
+	if err != nil {
+		return nil, err
+	}
+	return &auth.Settings{
+		Credentials:    auth.Credentials{ClientID: clientID, ClientSecret: clientSecret},
+		OrganizationID: orgID,
+		Workspace:      workspace,
+	}, nil
+}
+
+// mergePreservedSettings combines freshly-collected credentials with the
+// non-credential fields from any prior settings file. Behavior:
+//   - Credentials / OrganizationID always come from `fresh`.
+//   - Workspace: use `fresh.Workspace` when non-empty (manual path); else
+//     preserve existing; else default to "default".
+//   - AllowDestructive, TelemetryEnabled, IsInternalUser: preserve existing
+//     when present, else use the documented defaults (false, true, false).
+//
+// Closes the long-standing carry-forward gap where re-running login reset
+// Workspace and AllowDestructive even though TelemetryEnabled and
+// IsInternalUser were preserved.
+func mergePreservedSettings(existing, fresh *auth.Settings) *auth.Settings {
+	merged := &auth.Settings{
+		Credentials:      fresh.Credentials,
+		OrganizationID:   fresh.OrganizationID,
+		Workspace:        fresh.Workspace,
+		AllowDestructive: false,
+		TelemetryEnabled: true,
+		IsInternalUser:   false,
+	}
+	if existing != nil {
+		if merged.Workspace == "" {
+			merged.Workspace = existing.Workspace
+		}
+		merged.AllowDestructive = existing.AllowDestructive
+		merged.TelemetryEnabled = existing.TelemetryEnabled
+		merged.IsInternalUser = existing.IsInternalUser
+	}
+	if merged.Workspace == "" {
+		merged.Workspace = "default"
+	}
+	return merged
+}
+
+// emitLoginTelemetry sends a single `login` event. Reads the existing
+// settings file (if any) for telemetry preference + internal-user marker —
+// matching the long-standing behavior where the freshly-written file's
+// telemetry mode is the source of truth. On a fresh install (no file)
+// defaults to telemetry enabled, non-internal.
+func emitLoginTelemetry(start time.Time, orgID string, success bool, errorType string) {
+	telemetryEnabled := true
+	isInternalUser := false
+	if s, err := auth.ReadSettingsFile(); err == nil {
+		telemetryEnabled = s.TelemetryEnabled
+		isInternalUser = s.IsInternalUser
+	}
+	mode := telemetry.ResolveMode(telemetryEnabled)
+	t := telemetry.New(mode, orgID, Version, isInternalUser)
+	t.TrackCommand(telemetry.CommandEvent{
+		Command:    "login",
+		Success:    success,
+		ErrorType:  errorType,
+		DurationMs: time.Since(start).Milliseconds(),
+	})
+	t.Flush()
+}
+
+// exitCodeFor maps an error to a CLI exit code. *client.APIError carries
+// its own mapping (401/403→2, 404→3, 400/422→4, else 1); everything else
+// falls through to ExitGeneral.
+func exitCodeFor(err error) int {
+	var apiErr *client.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.ExitCode()
+	}
+	return client.ExitGeneral
+}
+
+// classifyError returns a coarse error_type label for telemetry. Prefers
+// the *client.APIError.Type when present, otherwise inspects the error
+// string for known OAuth / network markers.
+func classifyError(err error) string {
+	var apiErr *client.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.Type
+	}
+	msg := err.Error()
+	switch {
+	case strings.Contains(msg, "state mismatch"):
+		return "oauth_state_mismatch"
+	case strings.Contains(msg, "context deadline"), strings.Contains(msg, "timeout"):
+		return "timeout"
+	case strings.Contains(msg, "calling /"), strings.Contains(msg, "token exchange"):
+		return "network"
+	default:
+		return "unknown"
+	}
+}
+
+// stdinIsTTY reports whether os.Stdin is attached to a terminal. Uses
+// os.ModeCharDevice on stdin's file info — works on macOS, Linux, and
+// Windows without pulling in go-isatty.
+func stdinIsTTY() bool {
+	fi, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (fi.Mode() & os.ModeCharDevice) != 0
 }
 
 func promptRequired(reader *bufio.Reader, label string) (string, error) {

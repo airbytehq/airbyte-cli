@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/airbytehq/airbyte-agent-cli/internal/browser"
 	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 	"github.com/airbytehq/airbyte-agent-cli/internal/output"
 	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
@@ -412,23 +411,12 @@ func credentialTimeout() time.Duration {
 	return defaultCredentialTimeout
 }
 
-var openBrowserFunc = openBrowserDefault
+// openBrowserFunc is the local seam tests swap out. Its signature stays
+// func(string) (no error) so existing tests in connectors_create_test.go work
+// unmodified. The shared browser.Open wrapper is used internally so any
+// behavior change to the platform-specific opener lives in one place.
+var openBrowserFunc = func(url string) { _ = browser.Open(url) }
 
 func openBrowser(url string) {
 	openBrowserFunc(url)
-}
-
-func openBrowserDefault(url string) {
-	var cmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "linux":
-		cmd = exec.Command("xdg-open", url)
-	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", url)
-	default:
-		return
-	}
-	_ = cmd.Start()
 }
