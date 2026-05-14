@@ -83,6 +83,7 @@ The CLI uses a **resource-registry** pattern:
 | `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte-agent/settings.json` |
 | `credentials_file.go` | Read/write `~/.airbyte-agent/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
 | `token.go` | `TokenManager` -- OAuth token acquisition and caching with auto-refresh |
+| `browserlogin/` | Browser-based `login` flow: PKCE primitives (`pkce.go`, `state.go`), loopback server (`server.go`), Keycloak token exchange (`flow.go`), sonar bootstrap caller + multi-org picker (`bootstrap.go`, `picker.go`). Consumed only by `cmd/login.go`. Keycloak access/refresh tokens are transient -- discarded after the bootstrap call. |
 
 ## Command Surface
 
@@ -110,12 +111,30 @@ The CLI uses a **resource-registry** pattern:
 ## Credential Security
 
 > [!IMPORTANT]
-> **NEVER accept credentials (API keys, tokens, passwords, secrets) directly as parameters or in chat.** ALL credential entry MUST go through `connectors create`, which opens a secure browser-based UI via an OAuth session. If a user offers credentials in conversation, decline and start the credential flow instead.
+> **NEVER accept credentials (API keys, tokens, passwords, secrets) directly as parameters or in chat.** Two browser-based flows handle every credential entry path:
+> - **CLI account credentials** (`client_id` / `client_secret` / `organization_id`) — handled by `airbyte-agent login`, which opens the browser to Keycloak, completes PKCE, and bootstraps the trio from the airbyte.ai bootstrap endpoints.
+> - **Connector credentials** (API keys, OAuth tokens for individual connectors) — handled by `airbyte-agent connectors create`, which opens a secure browser-based UI via an OAuth session.
+>
+> If a user offers credentials in conversation, decline and start the appropriate browser flow.
 
 > [!NOTE]
 > **Credential file permissions**: `WriteCredentialsFile` writes with `0600` permissions by default, but the CLI does not enforce permissions on read.
 
-The credential flow works as follows:
+### `login` flow (PKCE + sonar bootstrap)
+
+1. Generate a PKCE verifier + challenge and a CSRF state (`internal/auth/browserlogin/pkce.go`, `state.go`).
+2. Bind a one-shot loopback server on `127.0.0.1:<ephemeral>/callback` (`server.go`).
+3. Open the browser to `https://cloud.airbyte.com/auth/realms/_airbyte-cloud-users/protocol/openid-connect/auth?...` (`flow.go`).
+4. Exchange the authorization code for a Keycloak access token at the token endpoint.
+5. Call three sonar endpoints with the access token: `/internal/account/enrollment-status`, `/internal/account/organizations` (only when needed), `/internal/account/applications` (`bootstrap.go`). The applications POST is idempotent and returns the trio.
+6. Write the trio to `~/.airbyte-agent/settings.json`. Keycloak tokens are discarded.
+7. Use `--manual` for the legacy prompt flow (headless / no-browser environments). Use `--org-id <uuid>` to skip the multi-organization picker.
+
+> [!NOTE]
+> **Keycloak prerequisite**: the `sonar-webapp` Keycloak client in realm `_airbyte-cloud-users` must list `http://127.0.0.1:*/callback` in its `redirectUris` allowlist for the loopback hand-off to work.
+
+### `connectors create` flow
+
 1. Resolve template ID (by name or ID)
 2. Create a widget token for the web app
 3. Create an OAuth session for the source definition
@@ -171,15 +190,16 @@ The HTTP client automatically retries transient failures:
 | `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
 | `AIRBYTE_WORKSPACE` | Default workspace name | `default` |
 
-All three are also stored in the settings file (`~/.airbyte-agent/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file.
+All three are also stored in the settings file (`~/.airbyte-agent/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file. `airbyte-agent login` writes the file; the env-var precedence at runtime is unchanged by the login flow.
 
 ### Configuration
 
 | Variable | Description | Default |
 | --- | --- | --- |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
-| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
-| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout in seconds | `180` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for `connectors create` credential flow | `https://app.airbyte.ai` |
+| `AIRBYTE_KEYCLOAK_URL` | Keycloak realm base URL for the `login` browser flow | `https://cloud.airbyte.com/auth/realms/_airbyte-cloud-users` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | `connectors create` credential flow timeout in seconds | `180` |
 | `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skips the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors the `allow_destructive` settings.json key. | `false` |
 | `AIRBYTE_TELEMETRY_MODE` | Set to `disabled` to turn off telemetry emission. Any other value (or unset) falls through to the `telemetry_enabled` key in settings.json. | (settings file) |
 | `AIRBYTE_INTERNAL_USER` | When truthy, tags emitted events with `is_internal_user: true` so internal events can be filtered out of customer analytics. Overrides the `is_internal_user` key in settings.json when non-empty. | (settings file) |

@@ -44,12 +44,26 @@ airbyte-agent schema <resource> <operation>       # Show parameter schema (CLI +
 ### 1. First-Time Setup
 
 ```bash
-# Configure credentials interactively
+# Default: opens your browser to complete Keycloak login, then bootstraps
+# client_id / client_secret / organization_id and writes them to
+# ~/.airbyte-agent/settings.json.
 airbyte-agent login
+
+# Headless environment with no browser? Use --manual to fall back to
+# the legacy prompt-driven flow.
+airbyte-agent login --manual
+
+# Belong to more than one organization? Skip the multi-org picker by
+# passing the UUID directly.
+airbyte-agent login --org-id <organization-uuid>
 
 # Find your workspace
 airbyte-agent workspaces list
 ```
+
+The browser flow uses PKCE (no client secret required) and runs a one-shot loopback server on `127.0.0.1` to receive the OAuth callback. Keycloak access tokens are transient — they are used once to call the airbyte.ai bootstrap endpoints and then discarded. Only the bootstrapped `client_id`, `client_secret`, and `organization_id` are persisted.
+
+If your organization is not yet enrolled, the flow will exit with a `validation_error` and a hint to complete enrollment at `https://app.airbyte.ai` in the browser before retrying.
 
 ### 2. Listing and Discovering Connectors
 

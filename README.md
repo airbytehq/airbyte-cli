@@ -85,7 +85,28 @@ Copy or symlink `skills/<command>/` into your agent's skill directory directly (
 
 Settings can be supplied via environment variables or a settings file at `~/.airbyte-agent/settings.json`. Three pieces of information are always required: client ID, client secret, and organization ID.
 
-Run `airbyte-agent login` to be prompted for these values and have the file written for you with the right permissions.
+### Sign in with `airbyte-agent login`
+
+By default, `airbyte-agent login` opens your browser to complete the Keycloak login at airbyte.ai, then bootstraps `client_id`, `client_secret`, and `organization_id` from the airbyte.ai bootstrap endpoints and writes them to `~/.airbyte-agent/settings.json` with `0600` permissions. The Keycloak access token used during the handshake is transient — it is discarded as soon as the credentials are written.
+
+```bash
+# Default: browser flow
+airbyte-agent login
+
+# Headless / no-browser environment? Fall back to the legacy prompt flow
+# that asks you for client_id, client_secret, and organization_id directly.
+airbyte-agent login --manual
+
+# Belong to more than one organization? Skip the multi-org picker.
+airbyte-agent login --org-id <organization-uuid>
+
+# Inspect the saved settings (the secret is obfuscated)
+airbyte-agent login show
+```
+
+The browser flow uses PKCE (no client secret in the CLI) and starts a one-shot loopback server on `127.0.0.1:<ephemeral>/callback` to receive the OAuth redirect. Re-running `airbyte-agent login` only rewrites the credential trio — your `workspace`, `allow_destructive`, `telemetry_enabled`, and `is_internal_user` values are preserved.
+
+If your organization is not yet enrolled, the flow exits with a `validation_error` and a hint to complete enrollment at `https://app.airbyte.ai` before retrying.
 
 ### Resolution order
 
@@ -104,8 +125,9 @@ Env vars take precedence over the file when all three are present, so they're us
 | `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
 | `AIRBYTE_WORKSPACE` | Default workspace name (used when commands don't pass `workspace`) | `default` |
 | `AIRBYTE_API_HOST` | API base URL | `https://api.airbyte.ai` |
-| `AIRBYTE_WEBAPP_URL` | Web app URL for credential flows | `https://app.airbyte.ai` |
-| `AIRBYTE_CREDENTIAL_TIMEOUT` | Credential flow timeout (seconds) | `180` |
+| `AIRBYTE_WEBAPP_URL` | Web app URL for the `connectors create` credential widget | `https://app.airbyte.ai` |
+| `AIRBYTE_KEYCLOAK_URL` | Keycloak realm base URL used by the `login` browser flow | `https://cloud.airbyte.com/auth/realms/_airbyte-cloud-users` |
+| `AIRBYTE_CREDENTIAL_TIMEOUT` | `connectors create` credential flow timeout (seconds) | `180` |
 | `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skip the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors `allow_destructive` in the settings file. | `false` |
 | `AIRBYTE_TELEMETRY_MODE` | Set to `disabled` to turn off telemetry. Any other value (or unset) falls through to `telemetry_enabled` in the settings file. | (settings file) |
 
