@@ -57,7 +57,7 @@ The CLI uses a **resource-registry** pattern:
 | --- | --- |
 | `types.go` | `Resource` interface, `Operation` struct, `OperationSchema`, `ParamSchema`, `OperationHooks` |
 | `registry.go` | Thread-safe global registry: `Register()`, `All()`, `Get()`, `Reset()` |
-| `builder.go` | Converts registered resources into Cobra commands with per-parameter flags, `--json`, `--describe`, file input (`@filename`), parameter validation, and hook execution |
+| `builder.go` | Converts registered resources into Cobra commands with per-parameter flags, `--json`, file input (`@filename`), parameter validation, and hook execution |
 
 ### Resources (`internal/resources/`)
 
@@ -102,7 +102,6 @@ The CLI uses a **resource-registry** pattern:
 | Flag | Description | Default |
 | --- | --- | --- |
 | `--format` | Output format: `json` or `table` | `json` |
-| `--describe` | Print operation schema and exit (do not execute) | `false` |
 | `--output, -o` | Write output to file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--json` | Operation flag for inline JSON parameters; mutually exclusive with per-parameter flags | -- |

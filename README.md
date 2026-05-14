@@ -2,7 +2,7 @@
 
 A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents.
 
-The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte-agent <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `--describe`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
+The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte-agent <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `airbyte-agent schema`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
 
 See [`AGENTS.md`](AGENTS.md) for the full architecture reference and [`CONTEXT.md`](CONTEXT.md) for the agent-facing usage guide.
 
@@ -161,7 +161,6 @@ Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the
 | --- | --- | --- |
 | `--json` | Operation flag for inline JSON parameters (or `@filename` to load from a file). Cannot be combined with per-parameter flags. | -- |
 | `--format` | Output format: `json` or `table` | `json` |
-| `--describe` | Print the operation's parameter schema and exit | `false` |
 | `--output, -o` | Write output to a file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--fields` | Filter the response to only the listed fields. Comma-separated, dotted paths (e.g. `data.id,data.name`). Applied client-side, after the API responds. Errors are not filtered. | -- |
@@ -195,11 +194,10 @@ This is **client-side**: the full payload still travels from the API to the CLI.
 ```bash
 airbyte-agent --help                              # list resources
 airbyte-agent connectors --help                   # list operations
-airbyte-agent connectors execute --describe       # CLI params + OpenAPI request/response schema
-airbyte-agent schema connectors execute           # equivalent top-level form
+airbyte-agent schema connectors execute           # CLI params + OpenAPI request/response schema
 ```
 
-`--describe` and `airbyte-agent schema <resource> <operation>` return the same payload: CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
+`airbyte-agent schema <resource> <operation>` returns the CLI-level parameters under `params`, plus the underlying OpenAPI route (path, method, parameters, request body, response) under `api`. The OpenAPI schemas are extracted at build time from `api/*.json` and cover only the routes the CLI actually uses, so the dump stays focused.
 
 ### Examples
 

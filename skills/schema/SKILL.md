@@ -9,7 +9,7 @@ command: airbyte-agent schema
 > [!NOTE]
 > Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or see the [project README](https://github.com/airbytehq/airbyte-agent-cli#install).
 
-Return the full machine-readable schema for an operation: the CLI-level parameter shape **and** the underlying OpenAPI route's parameters, request body, and response. Equivalent to `<resource> <operation> --describe`, but discoverable as a top-level command.
+Return the full machine-readable schema for an operation: the CLI-level parameter shape **and** the underlying OpenAPI route's parameters, request body, and response.
 
 > [!IMPORTANT]
 > Run `airbyte-agent schema <resource> <operation>` **before** writing code or scripts that consume an operation's output. The `api.response` schema tells you exactly what fields will come back so you can pass `--fields` correctly the first time.
@@ -54,18 +54,8 @@ The two surfaces are intentionally separate:
 - **When `--fields` returns something unexpected** — `api.response` shows the exact field names and structure.
 - **When discovering the API surface** as an agent — `airbyte-agent schema <r> <op>` is the canonical way to learn what an operation does without making a request.
 
-## Equivalents
-
-```bash
-airbyte-agent schema connectors execute
-# is identical to
-airbyte-agent connectors execute --describe
-```
-
-Use whichever fits your flow. `airbyte-agent schema` is the discoverable top-level form; `--describe` is the per-operation flag.
-
 ## Hints
 
-- `--describe` and `airbyte-agent schema` never make API calls — safe to run without auth, against unfamiliar accounts, etc.
+- `airbyte-agent schema` never makes API calls — safe to run without auth, against unfamiliar accounts, etc.
 - Errors from `airbyte-agent schema` (unknown resource or operation) are JSON on stderr with exit code 3.
 - Operations that don't map to an OpenAPI route omit the `api` block. (`airbyte-agent login` is also purely local but isn't a registered operation — it's a top-level command.)

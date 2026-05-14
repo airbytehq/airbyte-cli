@@ -100,7 +100,6 @@ func emitPendingEvent() {
 type flagAccessor interface {
 	GetFormat() string
 	GetOutput() string
-	GetDescribe() bool
 	GetFields() []string
 }
 
@@ -137,12 +136,11 @@ type paramBinding struct {
 }
 
 var reservedFlagNames = map[string]bool{
-	"describe": true,
-	"format":   true,
-	"help":     true,
-	"json":     true,
-	"output":   true,
-	"verbose":  true,
+	"format":  true,
+	"help":    true,
+	"json":    true,
+	"output":  true,
+	"verbose": true,
 }
 
 // flagNameFor maps a snake_case schema key to a kebab-case CLI flag.
@@ -158,22 +156,6 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 	cmd := &cobra.Command{
 		Use:   op.Name,
 		Short: op.Description,
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			if flags.GetDescribe() {
-				if op.SpecRef.IsInternal() {
-					writeStderrJSON(map[string]any{
-						"type":    "not_supported",
-						"message": fmt.Sprintf("no published schema for %q; run `%s --help` for argument details", op.Name, cmd.CommandPath()),
-					})
-					osExit(client.ExitNotFound)
-				}
-				if err := output.WriteJSON(os.Stdout, BuildSchemaOutput(*op)); err != nil {
-					writeStderrError("output_error", err.Error())
-					osExit(client.ExitGeneral)
-				}
-				osExit(client.ExitSuccess)
-			}
-		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			beginTrackedCommand(cmd, op)
 			defer emitPendingEvent()
@@ -420,7 +402,7 @@ func validateParams(params map[string]any, schema OperationSchema) error {
 		errPayload := map[string]any{
 			"type":   "validation_error",
 			"fields": fields,
-			"hint":   "run this command with --describe to see the expected parameter schema",
+			"hint":   "run `airbyte-agent schema <resource> <operation>` to see the expected parameter schema",
 		}
 		writeStderrJSON(errPayload)
 		osExit(client.ExitValidation)
