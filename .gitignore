@@ -40,3 +40,9 @@ Thumbs.db
 .airbyte/
 .airbyte-agent/
 credentials
+
+# Research and planning artifacts (used by /research, /spec, /implement)
+thoughts/
+
+.claude/commands/cross-project-spec.md
+.claude/commands/cross-project-implement.md
