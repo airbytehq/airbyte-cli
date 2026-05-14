@@ -25,7 +25,7 @@ type Operation struct {
 // SpecRef points an Operation at the OpenAPI route that backs it. The
 // extract-schemas generator uses these to emit only the routes actually used
 // by the CLI; the runtime uses them to look up request/response schemas for
-// `--describe` and `airbyte-agent schema`.
+// `airbyte-agent schema`.
 type SpecRef struct {
 	Path   string
 	Method string
@@ -42,8 +42,8 @@ func (s SpecRef) IsZero() bool {
 }
 
 // IsInternal reports whether the ref targets a non-public API route. Internal
-// routes are excluded from the embedded spec map and from the schema /
-// --describe surface — callers fall back to `--help` for argument details.
+// routes are excluded from the embedded spec map and from the `schema`
+// command's output — callers fall back to `--help` for argument details.
 func (s SpecRef) IsInternal() bool {
 	return strings.HasPrefix(s.Path, "/api/v1/internal/")
 }
