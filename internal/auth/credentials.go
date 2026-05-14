@@ -43,6 +43,12 @@ type Settings struct {
 	// to false when the file is missing the key. AIRBYTE_INTERNAL_USER
 	// overrides the saved value when set.
 	IsInternalUser bool
+	// VersionCheckEnabled controls whether the CLI checks GitHub
+	// releases for a newer version once per day and prints a nudge.
+	// Defaults to true when the file is missing the key.
+	// AIRBYTE_VERSION_CHECK=disabled forces this off regardless of the
+	// saved value.
+	VersionCheckEnabled bool
 }
 
 // ResolveSettings returns the Settings to use for the current invocation.
@@ -73,12 +79,13 @@ func fromEnv() (*Settings, bool) {
 		return nil, false
 	}
 	return &Settings{
-		Credentials:      Credentials{ClientID: id, ClientSecret: secret},
-		OrganizationID:   orgID,
-		Workspace:        os.Getenv("AIRBYTE_WORKSPACE"),
-		AllowDestructive: parseBoolEnv(os.Getenv("AIRBYTE_ALLOW_DESTRUCTIVE")),
-		TelemetryEnabled: !telemetryDisabledFromEnv(),
-		IsInternalUser:   parseBoolEnv(os.Getenv("AIRBYTE_INTERNAL_USER")),
+		Credentials:         Credentials{ClientID: id, ClientSecret: secret},
+		OrganizationID:      orgID,
+		Workspace:           os.Getenv("AIRBYTE_WORKSPACE"),
+		AllowDestructive:    parseBoolEnv(os.Getenv("AIRBYTE_ALLOW_DESTRUCTIVE")),
+		TelemetryEnabled:    !telemetryDisabledFromEnv(),
+		IsInternalUser:      parseBoolEnv(os.Getenv("AIRBYTE_INTERNAL_USER")),
+		VersionCheckEnabled: !versionCheckDisabledFromEnv(),
 	}, true
 }
 
@@ -87,6 +94,14 @@ func fromEnv() (*Settings, bool) {
 // the decision to the settings file / default.
 func telemetryDisabledFromEnv() bool {
 	return strings.EqualFold(strings.TrimSpace(os.Getenv("AIRBYTE_TELEMETRY_MODE")), "disabled")
+}
+
+// versionCheckDisabledFromEnv reports whether AIRBYTE_VERSION_CHECK
+// explicitly disables the version-check nudge. Any other value leaves the
+// decision to the settings file / default. The naming mirrors
+// AIRBYTE_TELEMETRY_MODE so the two opt-outs feel parallel.
+func versionCheckDisabledFromEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("AIRBYTE_VERSION_CHECK")), "disabled")
 }
 
 // parseBoolEnv treats common truthy strings ("1", "true", "yes", "on",
@@ -133,6 +148,9 @@ func fromFile() (*Settings, bool, error) {
 	}
 	if telemetryDisabledFromEnv() {
 		s.TelemetryEnabled = false
+	}
+	if versionCheckDisabledFromEnv() {
+		s.VersionCheckEnabled = false
 	}
 	return s, true, nil
 }

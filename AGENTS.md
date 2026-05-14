@@ -50,6 +50,7 @@ The CLI uses a **resource-registry** pattern:
 | `internal/config/` | Environment variable configuration loader |
 | `internal/output/` | JSON output formatter |
 | `internal/telemetry/` | Segment-backed anonymous usage events. One `CLI Command Executed` event per tracked invocation. Hardcoded write key in `config.go`; tracker no-ops when key is empty, mode is disabled, or org_id is unresolved. |
+| `internal/versioncheck/` | Once-per-day GitHub Releases poll + stderr nudge when the installed CLI is behind. Cache lives at `~/.airbyte-agent/version-check.json` (24h TTL). No-ops on non-TTY stderr, dev builds, prereleases, or when the user opts out. |
 
 ### Registry (`internal/registry/`)
 
@@ -204,6 +205,7 @@ All three are also stored in the settings file (`~/.airbyte-agent/settings.json`
 | `AIRBYTE_TELEMETRY_MODE` | Set to `disabled` to turn off telemetry emission. Any other value (or unset) falls through to the `telemetry_enabled` key in settings.json. | (settings file) |
 | `AIRBYTE_INTERNAL_USER` | When truthy, tags emitted events with `is_internal_user: true` so internal events can be filtered out of customer analytics. Overrides the `is_internal_user` key in settings.json when non-empty. | (settings file) |
 | `AIRBYTE_EXECUTION_CONTEXT` | Self-reported invocation context (`mcp`, `agent`, `direct`). Emitted as the `execution_context` property on every telemetry event. | `direct` |
+| `AIRBYTE_VERSION_CHECK` | Set to `disabled` to suppress the once-per-day "new version available" nudge. Any other value (or unset) falls through to the `version_check_enabled` key in settings.json. | (settings file) |
 
 Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions):
 
@@ -218,7 +220,8 @@ Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions
     "workspace": "default",
     "allow_destructive": false,
     "telemetry_enabled": true,
-    "is_internal_user": false
+    "is_internal_user": false,
+    "version_check_enabled": true
   }
 }
 ```
@@ -230,6 +233,8 @@ Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions
 `telemetry_enabled` defaults to `true` when the key is absent (matching the documented default). `login` always writes this key, so the absent case only occurs for settings files predating the field. `AIRBYTE_TELEMETRY_MODE=disabled` overrides the file value at runtime.
 
 `is_internal_user` defaults to `false`. Edit the file directly (or set `AIRBYTE_INTERNAL_USER=true`) to mark an invocation as Airbyte-internal so its events can be filtered out of customer analytics.
+
+`version_check_enabled` defaults to `true` when the key is absent. When `true`, the CLI hits `https://api.github.com/repos/airbytehq/airbyte-agent-cli/releases/latest` once every 24h and prints a one-line nudge to stderr when the installed binary is behind. The check is skipped on non-TTY stderr (so scripted use doesn't see the nudge), for dev builds and prereleases, and when `AIRBYTE_VERSION_CHECK=disabled`. Cache lives at `~/.airbyte-agent/version-check.json`.
 
 ## Adding New Resources
 
