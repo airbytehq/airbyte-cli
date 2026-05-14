@@ -8,7 +8,6 @@ import (
 )
 
 var (
-	format  string
 	output  string
 	verbose bool
 	fields  []string
@@ -27,7 +26,6 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&format, "format", "json", "Output format (json|table)")
 	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", "Output file path")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringSliceVar(&fields, "fields", nil, "Filter response to only the listed fields (comma-separated, dotted paths, e.g. 'data.id,data.name')")
@@ -41,10 +39,6 @@ func GetRootCmd() *cobra.Command {
 	return rootCmd
 }
 
-func GetFormat() string {
-	return format
-}
-
 func GetVerbose() bool {
 	return verbose
 }
@@ -55,7 +49,6 @@ func GetOutput() string {
 
 type flags struct{}
 
-func (f flags) GetFormat() string   { return format }
 func (f flags) GetOutput() string   { return output }
 func (f flags) GetFields() []string { return fields }
 

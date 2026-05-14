@@ -126,7 +126,7 @@ Env vars take precedence over the file when all three are present, so they're us
 airbyte-agent <resource> <operation> [flags]
 ```
 
-Parameters can be supplied two ways: as a single JSON document via `--json`, or as individual flags (`--workspace foo --name bar`). The two modes are **mutually exclusive** — passing both is an error. Output is JSON by default; `--format table` produces a human-readable table.
+Parameters can be supplied two ways: as a single JSON document via `--json`, or as individual flags (`--workspace foo --name bar`). The two modes are **mutually exclusive** — passing both is an error. Output is JSON.
 
 ### Two ways to pass parameters
 
@@ -160,7 +160,6 @@ Use `@filename` to load JSON from a file: `--json @params.json`. `--json` is the
 | Flag | Description | Default |
 | --- | --- | --- |
 | `--json` | Operation flag for inline JSON parameters (or `@filename` to load from a file). Cannot be combined with per-parameter flags. | -- |
-| `--format` | Output format: `json` or `table` | `json` |
 | `--output, -o` | Write output to a file instead of stdout | -- |
 | `--verbose, -v` | Enable debug logging | `false` |
 | `--fields` | Filter the response to only the listed fields. Comma-separated, dotted paths (e.g. `data.id,data.name`). Applied client-side, after the API responds. Errors are not filtered. | -- |

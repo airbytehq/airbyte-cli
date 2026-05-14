@@ -44,7 +44,7 @@ func TestUnknownRootCommandEmitsJSON(t *testing.T) {
 	root := newTestRoot()
 	root.Args = UnknownSubcommandArgs
 	root.Run = func(*cobra.Command, []string) {}
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	exit, stderr := runUnknownCommandTest(t, root, []string{"nothing"})
 
@@ -92,7 +92,7 @@ func TestUnknownRootCommandIncludesSuggestion(t *testing.T) {
 	root := newTestRoot()
 	root.Args = UnknownSubcommandArgs
 	root.Run = func(*cobra.Command, []string) {}
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	exit, stderr := runUnknownCommandTest(t, root, []string{"connector"})
 
@@ -126,7 +126,7 @@ func TestUnknownSubcommandScopesPayloadToResource(t *testing.T) {
 	root := newTestRoot()
 	root.Args = UnknownSubcommandArgs
 	root.Run = func(*cobra.Command, []string) {}
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	exit, stderr := runUnknownCommandTest(t, root, []string{"connectors", "notarealthing"})
 
@@ -170,7 +170,7 @@ func TestUnknownSubcommandSuggestsCloseMatch(t *testing.T) {
 	root := newTestRoot()
 	root.Args = UnknownSubcommandArgs
 	root.Run = func(*cobra.Command, []string) {}
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	exit, stderr := runUnknownCommandTest(t, root, []string{"connectors", "lits"})
 
@@ -199,7 +199,7 @@ func TestBareResourceShowsHelp(t *testing.T) {
 	root := newTestRoot()
 	root.Args = UnknownSubcommandArgs
 	root.Run = func(*cobra.Command, []string) {}
-	Build(root, stubClient(), &stubFlags{format: "json"})
+	Build(root, stubClient(), &stubFlags{})
 
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
