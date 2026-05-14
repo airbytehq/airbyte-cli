@@ -8,11 +8,10 @@ import (
 )
 
 var (
-	format   string
-	describe bool
-	output   string
-	verbose  bool
-	fields   []string
+	format  string
+	output  string
+	verbose bool
+	fields  []string
 )
 
 var rootCmd = &cobra.Command{
@@ -29,7 +28,6 @@ var rootCmd = &cobra.Command{
 
 func init() {
 	rootCmd.PersistentFlags().StringVar(&format, "format", "json", "Output format (json|table)")
-	rootCmd.PersistentFlags().BoolVar(&describe, "describe", false, "Print operation schema as JSON and exit")
 	rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", "Output file path")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Enable debug logging")
 	rootCmd.PersistentFlags().StringSliceVar(&fields, "fields", nil, "Filter response to only the listed fields (comma-separated, dotted paths, e.g. 'data.id,data.name')")
@@ -47,10 +45,6 @@ func GetFormat() string {
 	return format
 }
 
-func GetDescribe() bool {
-	return describe
-}
-
 func GetVerbose() bool {
 	return verbose
 }
@@ -63,7 +57,6 @@ type flags struct{}
 
 func (f flags) GetFormat() string   { return format }
 func (f flags) GetOutput() string   { return output }
-func (f flags) GetDescribe() bool   { return describe }
 func (f flags) GetFields() []string { return fields }
 
 func FlagAccessor() flags {

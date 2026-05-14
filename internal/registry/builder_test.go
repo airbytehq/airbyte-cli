@@ -19,10 +19,9 @@ func stubClient() *client.Client {
 }
 
 type stubFlags struct {
-	format   string
-	output   string
-	describe bool
-	fields   []string
+	format string
+	output string
+	fields []string
 }
 
 func (s *stubFlags) GetFormat() string {
@@ -31,10 +30,6 @@ func (s *stubFlags) GetFormat() string {
 
 func (s *stubFlags) GetOutput() string {
 	return s.output
-}
-
-func (s *stubFlags) GetDescribe() bool {
-	return s.describe
 }
 
 func (s *stubFlags) GetFields() []string {
@@ -48,7 +43,6 @@ func newTestRoot() *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().String("format", "json", "")
-	root.PersistentFlags().Bool("describe", false, "")
 	root.PersistentFlags().StringP("output", "o", "", "")
 	return root
 }
@@ -123,60 +117,20 @@ func TestBuildOperationFlags(t *testing.T) {
 	}
 }
 
-func TestDescribeReturnsSchema(t *testing.T) {
-	t.Cleanup(func() { Reset() })
-
-	schema := OperationSchema{
-		Description: "List all items",
-		Params: map[string]ParamSchema{
-			"workspace_id": {Type: "string", Required: true, Description: "Workspace ID"},
-			"limit":        {Type: "integer", Required: false, Description: "Max results", Default: 20},
-		},
-	}
-
-	Register(newMockResource("items", "Items",
-		Operation{
-			Name:        "list",
-			Description: "List items",
-			Schema:      schema,
-			Run: func(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
-				return nil, nil
+func TestBuildSchemaOutput(t *testing.T) {
+	op := Operation{
+		Name:        "list",
+		Description: "List items",
+		Schema: OperationSchema{
+			Description: "List all items",
+			Params: map[string]ParamSchema{
+				"workspace_id": {Type: "string", Required: true, Description: "Workspace ID"},
+				"limit":        {Type: "integer", Required: false, Description: "Max results", Default: 20},
 			},
 		},
-	))
-
-	exitCode, restore := captureExit(t)
-	defer restore()
-
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	root := newTestRoot()
-	flags := &stubFlags{format: "json", describe: true}
-	Build(root, nil, flags)
-
-	root.SetArgs([]string{"items", "list"})
-
-	func() {
-		defer func() { _ = recover() }()
-		_ = root.Execute()
-	}()
-
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	if *exitCode != client.ExitSuccess {
-		t.Fatalf("expected exit code %d, got %d", client.ExitSuccess, *exitCode)
 	}
 
-	var buf bytes.Buffer
-	_, _ = buf.ReadFrom(r)
-
-	var result OperationSchema
-	if err := json.Unmarshal(buf.Bytes(), &result); err != nil {
-		t.Fatalf("parsing describe output: %v (output: %s)", err, buf.String())
-	}
+	result := BuildSchemaOutput(op)
 
 	if result.Description != "List all items" {
 		t.Errorf("expected description 'List all items', got %q", result.Description)
