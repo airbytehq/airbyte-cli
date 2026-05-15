@@ -42,10 +42,18 @@ func main() {
 	// `login`) so a stale CLI still gets nudged on its very first
 	// command. Run is bounded internally by a 1s network timeout on the
 	// first-run sync fetch.
+	vcEnabled := versionCheckEnabled(settings)
+	vcIsTTY := versioncheck.IsTerminal(os.Stderr)
 	vcDone := versioncheck.Run(
 		cmd.Version,
-		versionCheckEnabled(settings),
-		versioncheck.IsTerminal(os.Stderr),
+		vcEnabled,
+		vcIsTTY,
+		os.Stderr,
+	)
+	versioncheck.CheckSkill(
+		cmd.ExpectedSkillVersion,
+		vcEnabled,
+		vcIsTTY,
 		os.Stderr,
 	)
 

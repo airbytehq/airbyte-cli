@@ -39,6 +39,9 @@ jobs:
           app-id: ${{ secrets.OCTAVIA_BOT_APP_ID }}
           private-key: ${{ secrets.OCTAVIA_BOT_PRIVATE_KEY }}
 
+      - name: Extract skill version
+        run: echo "SKILL_VERSION=$(./scripts/skill-version.sh)" >> "$GITHUB_ENV"
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6.4.0
         with:
@@ -51,3 +54,6 @@ jobs:
           # Cross-repo token (App-minted): lets goreleaser commit
           # Formula/airbyte-agent.rb to airbytehq/homebrew-tap.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.get-app-token.outputs.token }}
+          # Skill version stamped into the binary via cmd.ExpectedSkillVersion.
+          # Sourced from skills/airbyte-agent/SKILL.md by the previous step.
+          SKILL_VERSION: ${{ env.SKILL_VERSION }}
