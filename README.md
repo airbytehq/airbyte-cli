@@ -127,6 +127,7 @@ Env vars take precedence over the file when all three are present, so they're us
 | `AIRBYTE_CREDENTIAL_TIMEOUT` | `connectors create` credential flow timeout (seconds) | `180` |
 | `AIRBYTE_ALLOW_DESTRUCTIVE` | When truthy (`1`/`true`/`yes`/`on`), skip the interactive confirmation prompt on destructive commands like `connectors delete`. Mirrors `allow_destructive` in the settings file. | `false` |
 | `AIRBYTE_TELEMETRY_MODE` | Set to `disabled` to turn off telemetry. Any other value (or unset) falls through to `telemetry_enabled` in the settings file. | (settings file) |
+| `AIRBYTE_VERSION_CHECK` | Set to `disabled` to suppress the once-per-day "new version available" nudge. Any other value (or unset) falls through to `version_check_enabled` in the settings file. | (settings file) |
 
 ### Settings file
 
@@ -142,7 +143,8 @@ Env vars take precedence over the file when all three are present, so they're us
     "organization_id": "your-org-id",
     "workspace": "default",
     "allow_destructive": false,
-    "telemetry_enabled": true
+    "telemetry_enabled": true,
+    "version_check_enabled": true
   }
 }
 ```
@@ -155,6 +157,7 @@ Env vars take precedence over the file when all three are present, so they're us
 | `workspace` | Default workspace name; commands that take a `workspace` parameter fall back to this when not provided | `default` |
 | `allow_destructive` | When `true`, destructive commands (e.g. `connectors delete`) skip the interactive confirmation prompt. Intended as a one-time permission grant for agent harnesses without TTY input. | `false` |
 | `telemetry_enabled` | When `false`, anonymous usage telemetry is disabled. Can also be turned off at runtime with `AIRBYTE_TELEMETRY_MODE=disabled`. | `true` |
+| `version_check_enabled` | When `true`, the CLI polls GitHub Releases once every 24h and prints a one-line nudge to stderr if a newer release is available. The cache lives at `~/.airbyte-agent/version-check.json`. The check is automatically skipped on non-TTY stderr, for `dev`/prerelease builds, and when `AIRBYTE_VERSION_CHECK=disabled`. | `true` |
 
 ## Usage
 

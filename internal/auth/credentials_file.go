@@ -44,6 +44,10 @@ type settingsBody struct {
 	// predating this field.
 	TelemetryEnabled *bool `json:"telemetry_enabled,omitempty"`
 	IsInternalUser   bool  `json:"is_internal_user,omitempty"`
+	// VersionCheckEnabled is a *bool for the same reason as
+	// TelemetryEnabled: absent key reads as the documented default
+	// (true), not Go's zero-value false.
+	VersionCheckEnabled *bool `json:"version_check_enabled,omitempty"`
 }
 
 type credentialsBody struct {
@@ -82,17 +86,22 @@ func ReadSettingsFile() (*Settings, error) {
 	if sf.Settings.TelemetryEnabled != nil {
 		telemetryEnabled = *sf.Settings.TelemetryEnabled
 	}
+	versionCheckEnabled := true
+	if sf.Settings.VersionCheckEnabled != nil {
+		versionCheckEnabled = *sf.Settings.VersionCheckEnabled
+	}
 
 	return &Settings{
 		Credentials: Credentials{
 			ClientID:     sf.Settings.Credentials.ClientID,
 			ClientSecret: sf.Settings.Credentials.ClientSecret,
 		},
-		OrganizationID:   sf.Settings.OrganizationID,
-		Workspace:        sf.Settings.Workspace,
-		AllowDestructive: sf.Settings.AllowDestructive,
-		TelemetryEnabled: telemetryEnabled,
-		IsInternalUser:   sf.Settings.IsInternalUser,
+		OrganizationID:      sf.Settings.OrganizationID,
+		Workspace:           sf.Settings.Workspace,
+		AllowDestructive:    sf.Settings.AllowDestructive,
+		TelemetryEnabled:    telemetryEnabled,
+		IsInternalUser:      sf.Settings.IsInternalUser,
+		VersionCheckEnabled: versionCheckEnabled,
 	}, nil
 }
 
@@ -110,17 +119,19 @@ func WriteSettingsFile(s *Settings) error {
 	}
 
 	telemetryEnabled := s.TelemetryEnabled
+	versionCheckEnabled := s.VersionCheckEnabled
 	sf := settingsFile{
 		Settings: settingsBody{
 			Credentials: credentialsBody{
 				ClientID:     s.Credentials.ClientID,
 				ClientSecret: s.Credentials.ClientSecret,
 			},
-			OrganizationID:   s.OrganizationID,
-			Workspace:        s.Workspace,
-			AllowDestructive: s.AllowDestructive,
-			TelemetryEnabled: &telemetryEnabled,
-			IsInternalUser:   s.IsInternalUser,
+			OrganizationID:      s.OrganizationID,
+			Workspace:           s.Workspace,
+			AllowDestructive:    s.AllowDestructive,
+			TelemetryEnabled:    &telemetryEnabled,
+			IsInternalUser:      s.IsInternalUser,
+			VersionCheckEnabled: &versionCheckEnabled,
 		},
 	}
 	content, err := json.MarshalIndent(sf, "", "  ")

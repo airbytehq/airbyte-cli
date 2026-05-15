@@ -393,6 +393,81 @@ func TestResolveSettings_EnvTelemetryDisabledOverridesFile(t *testing.T) {
 	}
 }
 
+func TestSettingsFile_VersionCheckRoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_VERSION_CHECK", "")
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "")
+	t.Setenv("AIRBYTE_INTERNAL_USER", "")
+
+	original := &Settings{
+		Credentials:         Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID:      "org",
+		TelemetryEnabled:    true,
+		VersionCheckEnabled: false,
+	}
+	if err := WriteSettingsFile(original); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+
+	loaded, err := ReadSettingsFile()
+	if err != nil {
+		t.Fatalf("reading: %v", err)
+	}
+	if loaded.VersionCheckEnabled {
+		t.Error("VersionCheckEnabled=false did not survive round-trip")
+	}
+}
+
+func TestSettingsFile_VersionCheckDefaultsTrueWhenAbsent(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_VERSION_CHECK", "")
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "")
+	t.Setenv("AIRBYTE_INTERNAL_USER", "")
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+
+	writeSettings(t, tmpDir, validSettingsJSON)
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if !s.VersionCheckEnabled {
+		t.Error("VersionCheckEnabled defaulted to false; expected true when key is absent")
+	}
+}
+
+func TestResolveSettings_EnvVersionCheckDisabledOverridesFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+	t.Setenv("AIRBYTE_TELEMETRY_MODE", "")
+	t.Setenv("AIRBYTE_INTERNAL_USER", "")
+
+	if err := WriteSettingsFile(&Settings{
+		Credentials:         Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID:      "org",
+		TelemetryEnabled:    true,
+		VersionCheckEnabled: true,
+	}); err != nil {
+		t.Fatalf("writing: %v", err)
+	}
+	t.Setenv("AIRBYTE_CLIENT_ID", "")
+	t.Setenv("AIRBYTE_CLIENT_SECRET", "")
+	t.Setenv("AIRBYTE_ORGANIZATION_ID", "")
+	t.Setenv("AIRBYTE_VERSION_CHECK", "disabled")
+
+	s, err := ResolveSettings()
+	if err != nil {
+		t.Fatalf("ResolveSettings: %v", err)
+	}
+	if s.VersionCheckEnabled {
+		t.Error("AIRBYTE_VERSION_CHECK=disabled did not override file value")
+	}
+}
+
 func TestResolveSettings_EnvInternalUserOverridesFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
