@@ -50,6 +50,7 @@ Each row points to the per-command playbook with usage, workflows, error recover
 | List workspaces (usually the first command in a session) | [`references/workspaces-list.md`](references/workspaces-list.md) |
 | Set the default workspace in `~/.airbyte-agent/settings.json` | [`references/workspaces-use.md`](references/workspaces-use.md) |
 | List organizations the authenticated user belongs to | [`references/organizations-list.md`](references/organizations-list.md) |
+| Set the default organization in `~/.airbyte-agent/settings.json` | [`references/organizations-use.md`](references/organizations-use.md) |
 | Print the merged CLI + OpenAPI schema for any operation | [`references/schema.md`](references/schema.md) |
 
 ## Typical session shape
