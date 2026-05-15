@@ -73,6 +73,161 @@ func TestOrganizationsList(t *testing.T) {
 	}
 }
 
+func TestUseOrganization_UpdatesSettingsFile(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+
+	if err := auth.WriteSettingsFile(&auth.Settings{
+		Credentials:    auth.Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID: "old-org",
+		Workspace:      "ws",
+	}); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": "11111111-1111-1111-1111-111111111111", "name": "Alpha"}, {"id": "22222222-2222-2222-2222-222222222222", "name": "Beta"}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	// Type the UUID in uppercase. The API returned it lowercase — we
+	// should save the canonical form.
+	result, err := useOrganization(context.Background(), c, map[string]any{"id": "22222222-2222-2222-2222-222222222222"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map result, got %T", result)
+	}
+	if resMap["organization_id"] != "22222222-2222-2222-2222-222222222222" {
+		t.Errorf("expected organization_id=22222222-...-222, got %v", resMap["organization_id"])
+	}
+
+	loaded, err := auth.ReadSettingsFile()
+	if err != nil {
+		t.Fatalf("re-reading settings: %v", err)
+	}
+	if loaded.OrganizationID != "22222222-2222-2222-2222-222222222222" {
+		t.Errorf("settings.json organization_id = %q, want UUID", loaded.OrganizationID)
+	}
+	// Other fields preserved.
+	if loaded.Credentials.ClientID != "id" || loaded.Workspace != "ws" {
+		t.Errorf("other fields lost: %+v", loaded)
+	}
+}
+
+func TestUseOrganization_AcceptsOrganizationsEnvelope(t *testing.T) {
+	// The CLI's public API gateway uses `data`; the sonar bootstrap path
+	// uses `organizations`. lookupOrganizationID parses defensively so a
+	// future endpoint swap doesn't silently break this command.
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	if err := auth.WriteSettingsFile(&auth.Settings{
+		Credentials:    auth.Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID: "old-org",
+	}); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"organizations": [{"id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "organization_name": "Alpha"}], "is_instance_admin": false}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	if _, err := useOrganization(context.Background(), c, map[string]any{"id": "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	loaded, err := auth.ReadSettingsFile()
+	if err != nil {
+		t.Fatalf("re-reading settings: %v", err)
+	}
+	if loaded.OrganizationID != "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" {
+		t.Errorf("expected canonical lowercase UUID, got %q", loaded.OrganizationID)
+	}
+}
+
+func TestUseOrganization_NotFound(t *testing.T) {
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	if err := auth.WriteSettingsFile(&auth.Settings{
+		Credentials:    auth.Credentials{ClientID: "id", ClientSecret: "secret"},
+		OrganizationID: "org",
+	}); err != nil {
+		t.Fatalf("seeding settings: %v", err)
+	}
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": []}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	_, err := useOrganization(context.Background(), c, map[string]any{"id": "33333333-3333-3333-3333-333333333333"})
+	if err == nil {
+		t.Fatal("expected not_found error, got nil")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 404 {
+		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	}
+}
+
+func TestUseOrganization_MissingID(t *testing.T) {
+	_, err := useOrganization(context.Background(), nil, map[string]any{})
+	if err == nil {
+		t.Fatal("expected validation error, got nil")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 400 {
+		t.Errorf("expected status 400, got %d", apiErr.StatusCode)
+	}
+}
+
+func TestUseOrganization_NoSettingsFile(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data": [{"id": "11111111-1111-1111-1111-111111111111", "name": "Alpha"}]}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	_, err := useOrganization(context.Background(), c, map[string]any{"id": "11111111-1111-1111-1111-111111111111"})
+	if err == nil {
+		t.Fatal("expected error when settings.json doesn't exist")
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != 404 {
+		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	}
+}
+
 func TestWorkspacesListPagination(t *testing.T) {
 	callCount := 0
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

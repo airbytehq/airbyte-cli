@@ -65,7 +65,7 @@ The CLI uses a **resource-registry** pattern:
 | File | Purpose |
 | --- | --- |
 | `register.go` | `RegisterAll()` -- registers all resources in the global registry |
-| `organizations.go` | `organizations list` -- list available organizations |
+| `organizations.go` | `organizations list\|use` -- list and persist a default organization |
 | `workspaces.go` | `workspaces list` -- list/filter workspaces with automatic cursor pagination |
 | `connectors.go` | `connectors list\|list-available\|describe\|execute\|delete` -- connector management with name->ID resolution hooks |
 | `connectors_create.go` | `connectors create` -- interactive browser-based credential flow (OAuth session + polling) |
@@ -91,6 +91,7 @@ The CLI uses a **resource-registry** pattern:
 | Resource | Operation | Description | Key Params |
 | --- | --- | --- | --- |
 | `organizations` | `list` | List organizations | -- |
+| `organizations` | `use` | Set the default organization in `~/.airbyte-agent/settings.json` | `id` (required) |
 | `workspaces` | `list` | List/filter workspaces | `name_contains`, `status`, `limit` |
 | `connectors` | `list` | List workspace connectors | `workspace` (required) |
 | `connectors` | `list-available` | List connector templates | -- |

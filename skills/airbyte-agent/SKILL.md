@@ -2,7 +2,7 @@
 name: airbyte-agent
 description: Drive the airbyte-agent CLI to manage Airbyte connectors, workspaces, and organizations. Run list/get/search/create/update actions against connector data (HubSpot, Salesforce, Slack, GitHub, etc.), install new connectors via the browser credential flow, list and switch workspaces, list organizations, inspect a connector's entities and actions, or print the merged CLI + OpenAPI schema for any operation. Use when the user mentions Airbyte, the airbyte-agent CLI, connectors, syncs, workspaces, organizations, or asks to read/write data from a connected SaaS product.
 metadata:
-  version: "v0.1.1"
+  version: "v0.1.2"
 ---
 
 # airbyte-agent
@@ -50,6 +50,7 @@ Each row points to the per-command playbook with usage, workflows, error recover
 | List workspaces (usually the first command in a session) | [`references/workspaces-list.md`](references/workspaces-list.md) |
 | Set the default workspace in `~/.airbyte-agent/settings.json` | [`references/workspaces-use.md`](references/workspaces-use.md) |
 | List organizations the authenticated user belongs to | [`references/organizations-list.md`](references/organizations-list.md) |
+| Set the default organization in `~/.airbyte-agent/settings.json` | [`references/organizations-use.md`](references/organizations-use.md) |
 | Print the merged CLI + OpenAPI schema for any operation | [`references/schema.md`](references/schema.md) |
 
 ## Typical session shape
