@@ -19,6 +19,7 @@ builds:
       - -X github.com/airbytehq/airbyte-agent-cli/cmd.Version={{.Version}}
       - -X github.com/airbytehq/airbyte-agent-cli/cmd.Commit={{.Commit}}
       - -X github.com/airbytehq/airbyte-agent-cli/cmd.Date={{.Date}}
+      - -X github.com/airbytehq/airbyte-agent-cli/cmd.ExpectedSkillVersion={{.Env.SKILL_VERSION}}
     goos:
       - linux
       - darwin

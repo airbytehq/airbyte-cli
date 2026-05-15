@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	Version = "dev"
-	Commit  = "none"
-	Date    = "unknown"
+	Version              = "dev"
+	Commit               = "none"
+	Date                 = "unknown"
+	ExpectedSkillVersion = "dev"
 )
 
 var versionCmd = &cobra.Command{

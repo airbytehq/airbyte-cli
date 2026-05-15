@@ -1,0 +1,36 @@
+name: skill-version-bump
+
+on:
+  pull_request:
+    paths:
+      - 'skills/airbyte-agent/**'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+
+      - name: Compare skill version against base branch
+        run: |
+          set -euo pipefail
+          head=$(./scripts/skill-version.sh)
+          if ! base=$(git show "origin/${{ github.base_ref }}":skills/airbyte-agent/SKILL.md 2>/dev/null | ./scripts/skill-version.sh /dev/stdin 2>/dev/null); then
+            echo "::notice::Base branch has no skill version yet — accepting head=$head as the bootstrap."
+            exit 0
+          fi
+          if [ "$head" = "$base" ]; then
+            echo "::error::Skill version not bumped ($base unchanged). Bump skills/airbyte-agent/SKILL.md metadata.version."
+            exit 1
+          fi
+          greater=$(printf '%s\n%s\n' "$base" "$head" | sort -V | tail -1)
+          if [ "$greater" != "$head" ]; then
+            echo "::error::Skill version $head must be strictly greater than base $base."
+            exit 1
+          fi
+          echo "Skill version bumped: $base → $head"
