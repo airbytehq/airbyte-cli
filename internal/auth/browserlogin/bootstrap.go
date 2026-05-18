@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/client"
 )
 
-// BootstrapResult is the trio of values written to ~/.airbyte-agent/settings.json
+// BootstrapResult is the trio of values written to ~/.airbyte-cli/settings.json
 // after a successful browser login.
 type BootstrapResult struct {
 	ClientID       string
@@ -108,7 +108,7 @@ func Bootstrap(ctx context.Context, opts *BootstrapOptions) (*BootstrapResult, e
 	if !enr.IsEnrolled {
 		return nil, client.NewValidationError(
 			"complete onboarding at https://app.airbyte.ai before running login",
-			"open the URL in a browser, finish the enrollment flow, then re-run airbyte-agent login",
+			"open the URL in a browser, finish the enrollment flow, then re-run airbyte agents login",
 		)
 	}
 
@@ -163,7 +163,7 @@ func Bootstrap(ctx context.Context, opts *BootstrapOptions) (*BootstrapResult, e
 			if apiErr.StatusCode == http.StatusForbidden {
 				return nil, client.NewValidationError(
 					"your organization is not enrolled or its subscription is inactive",
-					"complete onboarding at https://app.airbyte.ai, then re-run airbyte-agent login",
+					"complete onboarding at https://app.airbyte.ai, then re-run airbyte agents login",
 				)
 			}
 			// 400 "specify target organization" — we already resolved an
@@ -222,7 +222,7 @@ func (o *BootstrapOptions) do(ctx context.Context, method, path, orgID string, b
 		version = "dev"
 	}
 	req.Header.Set(headerAgentCLI, version)
-	req.Header.Set("User-Agent", "airbyte-agent-cli/"+version)
+	req.Header.Set("User-Agent", "airbyte-cli/"+version)
 
 	httpClient := o.HTTPClient
 	if httpClient == nil {

@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/client"
 )
 
 func TestResolveTemplateID_ByID(t *testing.T) {

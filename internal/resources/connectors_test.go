@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/auth"
+	"github.com/airbytehq/airbyte-cli/internal/client"
 )
 
 func TestApplyDefaultWorkspace_EmptyFallsBackToHardcoded(t *testing.T) {

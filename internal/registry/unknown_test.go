@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/client"
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +60,7 @@ func TestUnknownRootCommandEmitsJSON(t *testing.T) {
 		t.Errorf("expected type=unknown_command, got %v", payload["type"])
 	}
 	msg, _ := payload["message"].(string)
-	if !strings.Contains(msg, `"nothing"`) || !strings.Contains(msg, "airbyte-agent") {
+	if !strings.Contains(msg, `"nothing"`) || !strings.Contains(msg, "airbyte") {
 		t.Errorf("message missing context: %q", msg)
 	}
 	hint, _ := payload["hint"].(string)
@@ -139,8 +139,8 @@ func TestUnknownSubcommandScopesPayloadToResource(t *testing.T) {
 		t.Fatalf("parsing stderr: %v (raw: %s)", err, stderr)
 	}
 	msg, _ := payload["message"].(string)
-	if !strings.Contains(msg, "airbyte-agent connectors") {
-		t.Errorf("expected message scoped to 'airbyte-agent connectors', got %q", msg)
+	if !strings.Contains(msg, "airbyte connectors") {
+		t.Errorf("expected message scoped to 'airbyte connectors', got %q", msg)
 	}
 	available, _ := payload["available_commands"].([]any)
 	names := make(map[string]bool)

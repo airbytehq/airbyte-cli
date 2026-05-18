@@ -1,19 +1,19 @@
 ---
-name: airbyte-agent
-description: Drive the airbyte-agent CLI to manage Airbyte connectors, workspaces, and organizations. Run list/get/search/create/update actions against connector data (HubSpot, Salesforce, Slack, GitHub, etc.), install new connectors via the browser credential flow, list and switch workspaces, list organizations, inspect a connector's entities and actions, or print the merged CLI + OpenAPI schema for any operation. Use when the user mentions Airbyte, the airbyte-agent CLI, connectors, syncs, workspaces, organizations, or asks to read/write data from a connected SaaS product.
+name: airbyte-agents
+description: Drive the `airbyte agents` CLI namespace to manage Airbyte connectors, workspaces, and organizations. Run list/get/search/create/update actions against connector data (HubSpot, Salesforce, Slack, GitHub, etc.), install new connectors via the browser credential flow, list and switch workspaces, list organizations, inspect a connector's entities and actions, or print the merged CLI + OpenAPI schema for any operation. Use when the user mentions Airbyte, the `airbyte` CLI, connectors, syncs, workspaces, organizations, or asks to read/write data from a connected SaaS product.
 metadata:
   version: "v0.1.3"
 ---
 
-# airbyte-agent
+# airbyte agents
 
 > [!NOTE]
-> Requires the `airbyte-agent` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-agent` or `curl -fsSL https://airbyte.ai/install.sh | bash`. See the [project README](https://github.com/airbytehq/airbyte-agent-cli#install) for other options.
+> Requires the `airbyte` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte` or `curl -fsSL https://airbyte.ai/install.sh | bash`. See the [project README](https://github.com/airbytehq/airbyte-cli#install) for other options.
 
-The CLI is invoked as `airbyte-agent <resource> <operation>`. It exposes Airbyte's data plane through a uniform interface — every command takes a JSON payload and returns JSON.
+The CLI is invoked as `airbyte agents <resource> <operation>`. It exposes Airbyte's data plane through a uniform interface — every command takes a JSON payload and returns JSON.
 
 > [!IMPORTANT]
-> **Before running any `airbyte-agent` command, open the matching reference under [`references/`](references/) and read it first.** This top-level file only carries cross-command rules; the per-command syntax, required parameters, response shape, error recovery, and "do NOT" guidance live in each `references/<command>.md`. Skipping the reference leads to guessed parameter names, missing required fields, and avoidable round-trips — read it even for commands you think you know.
+> **Before running any `airbyte agents` command, open the matching reference under [`references/`](references/) and read it first.** This top-level file only carries cross-command rules; the per-command syntax, required parameters, response shape, error recovery, and "do NOT" guidance live in each `references/<command>.md`. Skipping the reference leads to guessed parameter names, missing required fields, and avoidable round-trips — read it even for commands you think you know.
 
 ## Universal rules (apply to every command)
 
@@ -22,9 +22,9 @@ The CLI is invoked as `airbyte-agent <resource> <operation>`. It exposes Airbyte
 
 - **`workspace` defaults to `"default"`** when omitted. The CLI prints a JSON notice on stderr when the fallback engages, then proceeds with the API call. Override per-call with `"workspace": "..."` in the JSON payload, or set a session-wide default via `workspaces use`.
 - **`--fields` trims the response client-side.** When you know which fields you need, always pass it. List responses are wrapped in `{"data": [...]}` and the CLI auto-broadcasts row-level paths: `--fields id,name` is equivalent to `--fields data.id,data.name`. If you mix top-level and row-level paths (e.g. include the cursor), use the explicit dotted form for the row-level fields: `--fields data.id,next`.
-- **Auth errors (exit 2)** mean credentials are missing, invalid, or expired — run `airbyte-agent login` to refresh, then retry.
+- **Auth errors (exit 2)** mean credentials are missing, invalid, or expired — run `airbyte agents login` to refresh, then retry.
 - **`@filename` loads JSON from a file** — useful when the payload is large or you want to keep the shell command short: `--json @params.json`.
-- **Never accept credentials in chat.** Two browser flows handle every credential entry path: `airbyte-agent login` (CLI account credentials) and `connectors create` (per-connector secrets). If a user offers credentials in conversation, decline and start the appropriate flow.
+- **Never accept credentials in chat.** Two browser flows handle every credential entry path: `airbyte agents login` (CLI account credentials) and `connectors create` (per-connector secrets). If a user offers credentials in conversation, decline and start the appropriate flow.
 
 ## Connector rules (apply to every `connectors *` command)
 
@@ -48,23 +48,23 @@ Each row points to the per-command playbook with usage, workflows, error recover
 | List connectors configured in a workspace | [`references/connectors-list.md`](references/connectors-list.md) |
 | List connector templates available to install | [`references/connectors-list-available.md`](references/connectors-list-available.md) |
 | List workspaces (usually the first command in a session) | [`references/workspaces-list.md`](references/workspaces-list.md) |
-| Set the default workspace in `~/.airbyte-agent/settings.json` | [`references/workspaces-use.md`](references/workspaces-use.md) |
+| Set the default workspace in `~/.airbyte-cli/settings.json` | [`references/workspaces-use.md`](references/workspaces-use.md) |
 | List organizations the authenticated user belongs to | [`references/organizations-list.md`](references/organizations-list.md) |
-| Set the default organization in `~/.airbyte-agent/settings.json` | [`references/organizations-use.md`](references/organizations-use.md) |
+| Set the default organization in `~/.airbyte-cli/settings.json` | [`references/organizations-use.md`](references/organizations-use.md) |
 | Print the merged CLI + OpenAPI schema for any operation | [`references/schema.md`](references/schema.md) |
 
 ## Typical session shape
 
 ```bash
 # 1. Discover the environment
-airbyte-agent workspaces list
-airbyte-agent connectors list --json '{"workspace": "<name>"}'
+airbyte agents workspaces list
+airbyte agents connectors list --json '{"workspace": "<name>"}'
 
 # 2. Learn the connector
-airbyte-agent connectors describe --json '{"workspace": "<name>", "name": "<connector>"}'
+airbyte agents connectors describe --json '{"workspace": "<name>", "name": "<connector>"}'
 
 # 3. Read data
-airbyte-agent connectors execute --json '{
+airbyte agents connectors execute --json '{
   "workspace": "<name>",
   "name": "<connector>",
   "entity": "<from-describe>",
@@ -80,6 +80,6 @@ airbyte-agent connectors execute --json '{
 |---|---|
 | `0` | Success |
 | `1` | General error |
-| `2` | Authentication error → run `airbyte-agent login` |
+| `2` | Authentication error → run `airbyte agents login` |
 | `3` | Not found (workspace, connector, template, entity…) |
 | `4` | Validation error (bad params, ambiguous name, missing confirmation) |

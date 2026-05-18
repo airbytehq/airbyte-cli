@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth/browserlogin"
-	"github.com/airbytehq/airbyte-agent-cli/internal/browser"
+	"github.com/airbytehq/airbyte-cli/internal/auth"
+	"github.com/airbytehq/airbyte-cli/internal/auth/browserlogin"
+	"github.com/airbytehq/airbyte-cli/internal/browser"
 )
 
 func TestObfuscateSecret(t *testing.T) {
@@ -481,7 +481,7 @@ var _ io.Reader = (*bytes.Buffer)(nil)
 func TestLoginSuccessMessageShape(t *testing.T) {
 	want := map[string]string{
 		"status":  "saved",
-		"message": "Settings written to ~/.airbyte-agent/settings.json",
+		"message": "Settings written to ~/.airbyte-cli/settings.json",
 	}
 	// Re-encode → decode to verify the literal stays JSON-stable.
 	buf := &bytes.Buffer{}
@@ -497,7 +497,7 @@ func TestLoginSuccessMessageShape(t *testing.T) {
 	if got["status"] != "saved" {
 		t.Errorf("status = %q", got["status"])
 	}
-	if got["message"] != "Settings written to ~/.airbyte-agent/settings.json" {
+	if got["message"] != "Settings written to ~/.airbyte-cli/settings.json" {
 		t.Errorf("message = %q", got["message"])
 	}
 }

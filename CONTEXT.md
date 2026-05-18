@@ -1,14 +1,14 @@
 # Airbyte Agents CLI Context
 
-This document tells AI agents how to use the `airbyte-agent` CLI. For development/architecture details, see `AGENTS.md`.
+This document tells AI agents how to use the `airbyte` CLI. For development/architecture details, see `AGENTS.md`.
 
 ## Rules of Engagement
 
 > [!IMPORTANT]
-> **Schema Discovery**: If you don't know the exact JSON payload structure for a command, run `airbyte-agent schema <resource> <operation>` first. This returns the parameter schema without executing the operation.
+> **Schema Discovery**: If you don't know the exact JSON payload structure for a command, run `airbyte agents schema <resource> <operation>` first. This returns the parameter schema without executing the operation.
 
 > [!IMPORTANT]
-> **Always filter responses to the fields you need.** Whenever you know which fields will satisfy the user's request, pass `--fields` to trim the output. This applies to **every command** — list, describe, execute, etc. Unfiltered responses waste context window and bandwidth on data you will discard anyway. The only time to skip the filter is when you genuinely need the full payload (e.g. one-shot debugging, or you don't yet know which fields exist — in which case run `airbyte-agent schema <resource> <operation>` or do a small probe call first).
+> **Always filter responses to the fields you need.** Whenever you know which fields will satisfy the user's request, pass `--fields` to trim the output. This applies to **every command** — list, describe, execute, etc. Unfiltered responses waste context window and bandwidth on data you will discard anyway. The only time to skip the filter is when you genuinely need the full payload (e.g. one-shot debugging, or you don't yet know which fields exist — in which case run `airbyte agents schema <resource> <operation>` or do a small probe call first).
 >
 > For row-level reads via `connectors execute`, also pass `select_fields` (API-side) to reduce upstream work. `select_fields` and `--fields` are complementary: the first stops the source connector from emitting columns you don't need; the second trims what the CLI prints to stdout.
 
@@ -18,15 +18,15 @@ This document tells AI agents how to use the `airbyte-agent` CLI. For developmen
 ## Core Syntax
 
 ```bash
-airbyte-agent <resource> <operation> [flags]
+airbyte agents <resource> <operation> [flags]
 ```
 
 All parameters are passed via `--json '<JSON>'` or `--id '<ID>'`. Output goes to stdout as JSON.
 
 ```bash
-airbyte-agent --help                              # List all resources
-airbyte-agent <resource> --help                   # List operations for a resource
-airbyte-agent schema <resource> <operation>       # Show parameter schema (CLI + OpenAPI)
+airbyte agents --help                              # List all resources
+airbyte agents <resource> --help                   # List operations for a resource
+airbyte agents schema <resource> <operation>       # Show parameter schema (CLI + OpenAPI)
 ```
 
 ### Key Flags
@@ -46,19 +46,19 @@ airbyte-agent schema <resource> <operation>       # Show parameter schema (CLI +
 ```bash
 # Default: opens your browser to complete Keycloak login, then bootstraps
 # client_id / client_secret / organization_id and writes them to
-# ~/.airbyte-agent/settings.json.
-airbyte-agent login
+# ~/.airbyte-cli/settings.json.
+airbyte agents login
 
 # Headless environment with no browser? Use --manual to fall back to
 # the legacy prompt-driven flow.
-airbyte-agent login --manual
+airbyte agents login --manual
 
 # Belong to more than one organization? Skip the multi-org picker by
 # passing the UUID directly.
-airbyte-agent login --org-id <organization-uuid>
+airbyte agents login --org-id <organization-uuid>
 
 # Find your workspace
-airbyte-agent workspaces list
+airbyte agents workspaces list
 ```
 
 The browser flow uses PKCE (no client secret required) and runs a one-shot loopback server on `127.0.0.1` to receive the OAuth callback. Keycloak access tokens are transient — they are used once to call the airbyte.ai bootstrap endpoints and then discarded. Only the bootstrapped `client_id`, `client_secret`, and `organization_id` are persisted.
@@ -69,16 +69,16 @@ If your organization is not yet enrolled, the flow will exit with a `validation_
 
 ```bash
 # List connectors in a workspace
-airbyte-agent connectors list --json '{"workspace": "my-workspace"}'
+airbyte agents connectors list --json '{"workspace": "my-workspace"}'
 
 # List available connector templates (for creating new connectors)
-airbyte-agent connectors list-available
+airbyte agents connectors list-available
 
 # Describe a connector to see its entities and actions
-airbyte-agent connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
+airbyte agents connectors describe --json '{"workspace": "my-workspace", "name": "my-source"}'
 
 # Or by ID
-airbyte-agent connectors describe --id 'f24fb2b0-c054-48f1-9e0f-cfb62e12f878'
+airbyte agents connectors describe --id 'f24fb2b0-c054-48f1-9e0f-cfb62e12f878'
 ```
 
 ### 3. Executing Connector Actions
@@ -87,7 +87,7 @@ Always `describe` first to discover available entities and actions.
 
 ```bash
 # Read data from a connector
-airbyte-agent connectors execute --json '{
+airbyte agents connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "users",
@@ -95,7 +95,7 @@ airbyte-agent connectors execute --json '{
 }'
 
 # With parameters
-airbyte-agent connectors execute --json '{
+airbyte agents connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "deals",
@@ -104,7 +104,7 @@ airbyte-agent connectors execute --json '{
 }'
 
 # Limit response fields to protect context window
-airbyte-agent connectors execute --json '{
+airbyte agents connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "contacts",
@@ -113,7 +113,7 @@ airbyte-agent connectors execute --json '{
 }'
 
 # Exclude heavy fields
-airbyte-agent connectors execute --json '{
+airbyte agents connectors execute --json '{
   "workspace": "my-workspace",
   "name": "my-source",
   "entity": "messages",
@@ -126,10 +126,10 @@ airbyte-agent connectors execute --json '{
 
 ```bash
 # Browse available templates
-airbyte-agent connectors list-available
+airbyte agents connectors list-available
 
 # Create (opens browser for secure credential entry)
-airbyte-agent connectors create --json '{
+airbyte agents connectors create --json '{
   "workspace": "my-workspace",
   "name": "hubspot"
 }'
@@ -138,17 +138,17 @@ airbyte-agent connectors create --json '{
 ### 5. Deleting a Connector
 
 ```bash
-airbyte-agent connectors delete --json '{"workspace": "my-workspace", "name": "old-source"}'
+airbyte agents connectors delete --json '{"workspace": "my-workspace", "name": "old-source"}'
 ```
 
-Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` on a TTY. Without a TTY (e.g. piped agent input), the command refuses with a `validation_error` whose hint tells you to set `"allow_destructive": true` in `~/.airbyte-agent/settings.json` (or `AIRBYTE_ALLOW_DESTRUCTIVE=true`). Once that permission is granted, the prompt is skipped.
+Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` on a TTY. Without a TTY (e.g. piped agent input), the command refuses with a `validation_error` whose hint tells you to set `"allow_destructive": true` in `~/.airbyte-cli/settings.json` (or `AIRBYTE_ALLOW_DESTRUCTIVE=true`). Once that permission is granted, the prompt is skipped.
 
 ### 6. Schema Introspection
 
 Use the top-level `schema` command to see an operation's parameter schema (and underlying OpenAPI request/response) before calling it:
 
 ```bash
-airbyte-agent schema connectors execute
+airbyte agents schema connectors execute
 # Returns:
 # {
 #   "description": "Execute an action on a connector",
@@ -170,7 +170,7 @@ For complex JSON payloads, use `@filename`:
 
 ```bash
 echo '{"workspace": "my-workspace", "name": "my-source", "entity": "users", "action": "read"}' > params.json
-airbyte-agent connectors execute --json @params.json
+airbyte agents connectors execute --json @params.json
 ```
 
 ## Error Handling
@@ -193,7 +193,7 @@ Errors include a `hint` field with actionable guidance:
   "message": "connector \"gong\" not found in workspace \"default\"",
   "status_code": 404,
   "retryable": false,
-  "hint": "run 'airbyte-agent connectors list --json '{\"workspace\": \"default\"}'' to see available connectors"
+  "hint": "run 'airbyte agents connectors list --json '{\"workspace\": \"default\"}'' to see available connectors"
 }
 ```
 
@@ -209,13 +209,13 @@ API errors (400/422) include the full server response in `detail`:
 }
 ```
 
-When you see a validation error for missing parameters, run `airbyte-agent schema <resource> <operation>` to check the schema:
+When you see a validation error for missing parameters, run `airbyte agents schema <resource> <operation>` to check the schema:
 
 ```json
 {
   "type": "validation_error",
   "message": "missing required parameters: entity, action",
   "status_code": 400,
-  "hint": "run `airbyte-agent schema <resource> <operation>` to see the expected parameter schema"
+  "hint": "run `airbyte agents schema <resource> <operation>` to see the expected parameter schema"
 }
 ```

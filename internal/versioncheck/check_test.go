@@ -246,7 +246,7 @@ func TestRun_NoCacheFetchErrorSilentlyContinues(t *testing.T) {
 	if buf.Len() != 0 {
 		t.Errorf("expected silent failure, got %q", buf.String())
 	}
-	if _, err := os.Stat(filepath.Join(tmp, ".airbyte-agent", "version-check.json")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(tmp, ".airbyte-cli", "version-check.json")); !os.IsNotExist(err) {
 		t.Errorf("expected no cache file on fetch failure, got err=%v", err)
 	}
 }
@@ -275,7 +275,7 @@ func TestWriteCache_AtomicAndPermissions(t *testing.T) {
 	if err := writeCache(c); err != nil {
 		t.Fatalf("writeCache: %v", err)
 	}
-	info, err := os.Stat(filepath.Join(tmp, ".airbyte-agent", "version-check.json"))
+	info, err := os.Stat(filepath.Join(tmp, ".airbyte-cli", "version-check.json"))
 	if err != nil {
 		t.Fatalf("stat: %v", err)
 	}

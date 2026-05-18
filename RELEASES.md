@@ -1,6 +1,6 @@
 # Releases
 
-How to cut a new release of `airbyte-agent`, what happens behind the scenes, and how to clean up if something goes wrong.
+How to cut a new release of `airbyte`, what happens behind the scenes, and how to clean up if something goes wrong.
 
 ## TL;DR
 
@@ -35,11 +35,11 @@ The script does **not** publish anything itself — pushing the tag is what trig
 
 `.github/workflows/release.yml` fires on any `v*` tag push. It:
 
-1. Mints a cross-repo token via the Octavia bot GitHub App (scoped to `airbyte-agent-cli` + `homebrew-tap`).
+1. Mints a cross-repo token via the Octavia bot GitHub App (scoped to `airbyte-cli` + `homebrew-tap`).
 2. Runs `goreleaser release --clean`, which:
    - Builds cross-platform binaries (linux/darwin/windows × amd64/arm64).
-   - Creates a **draft** GitHub release in `airbyte-agent-cli` with the archives and `checksums.txt` attached.
-   - Commits an updated `Formula/airbyte-agent.rb` directly to `main` on `airbytehq/homebrew-tap`.
+   - Creates a **draft** GitHub release in `airbyte-cli` with the archives and `checksums.txt` attached.
+   - Commits an updated `Formula/airbyte.rb` directly to `main` on `airbytehq/homebrew-tap`.
 
 Prerelease tags (e.g. `v0.1.0-rc1`) are detected automatically: the GitHub release is still created (as a prerelease draft) but the brew formula commit is **skipped** (`skip_upload: auto` in `.goreleaser.yaml`).
 
@@ -49,24 +49,24 @@ The release stays as a draft until a human publishes it. This is intentional —
 
 Two ways to publish:
 
-**GitHub UI:** open the draft from `https://github.com/airbytehq/airbyte-agent-cli/releases`, click the pencil/edit icon, scroll to the bottom of the editor, click **Publish release**.
+**GitHub UI:** open the draft from `https://github.com/airbytehq/airbyte-cli/releases`, click the pencil/edit icon, scroll to the bottom of the editor, click **Publish release**.
 
 **CLI:**
 
 ```
-gh release edit vX.Y.Z --draft=false --repo airbytehq/airbyte-agent-cli
+gh release edit vX.Y.Z --draft=false --repo airbytehq/airbyte-cli
 ```
 
-Once published, the tarball URLs in the brew formula resolve and `brew install airbytehq/tap/airbyte-agent` works. Before publishing, those URLs return 404 to anonymous requests (which is what `brew` makes).
+Once published, the tarball URLs in the brew formula resolve and `brew install airbytehq/tap/airbyte` works. Before publishing, those URLs return 404 to anonymous requests (which is what `brew` makes).
 
 ## Removing a tag
 
 Tags are immutable by convention — once shipped, treat them as permanent. But if a release was never published (still a draft) and you need to redo it (wrong commit, broken build, etc.), here's the full cleanup.
 
-**1. Delete the draft GitHub release** at `https://github.com/airbytehq/airbyte-agent-cli/releases`. From CLI:
+**1. Delete the draft GitHub release** at `https://github.com/airbytehq/airbyte-cli/releases`. From CLI:
 
 ```
-gh release delete vX.Y.Z --repo airbytehq/airbyte-agent-cli --yes
+gh release delete vX.Y.Z --repo airbytehq/airbyte-cli --yes
 ```
 
 **2. Delete the tag locally and on origin:**
@@ -76,7 +76,7 @@ git tag -d vX.Y.Z
 git push origin :refs/tags/vX.Y.Z
 ```
 
-**3. Revert the formula commit on `homebrew-tap`** if goreleaser already pushed one. Find the bump commit in `https://github.com/airbytehq/homebrew-tap/commits/main` and revert it (or push a follow-up commit restoring the previous formula). If this is the first release, just delete `Formula/airbyte-agent.rb` from the tap.
+**3. Revert the formula commit on `homebrew-tap`** if goreleaser already pushed one. Find the bump commit in `https://github.com/airbytehq/homebrew-tap/commits/main` and revert it (or push a follow-up commit restoring the previous formula). If this is the first release, just delete `Formula/airbyte.rb` from the tap.
 
 **4. Re-run the release script** when ready:
 

@@ -11,30 +11,30 @@ List workspaces in the organization. Workspace names are the identifier passed t
 ## Usage
 
 ```bash
-airbyte-agent workspaces list --json '{}'
-airbyte-agent workspaces list --json '{"name_contains": "production"}'
-airbyte-agent workspaces list --json '{"status": "active"}'
+airbyte agents workspaces list --json '{}'
+airbyte agents workspaces list --json '{"name_contains": "production"}'
+airbyte agents workspaces list --json '{"status": "active"}'
 ```
 
-Run `airbyte-agent schema workspaces list` to see the full parameter schema.
+Run `airbyte agents schema workspaces list` to see the full parameter schema.
 
 ## Filtering output
 
 ```bash
-airbyte-agent workspaces list --fields name,status --json '{}'              # short form
-airbyte-agent workspaces list --fields data.name,data.status --json '{}'    # long form
+airbyte agents workspaces list --fields name,status --json '{}'              # short form
+airbyte agents workspaces list --fields data.name,data.status --json '{}'    # long form
 
 # Mixed top-level and row-level paths — use the long form for the row paths
-airbyte-agent workspaces list --fields data.name,next --json '{}'
+airbyte agents workspaces list --fields data.name,next --json '{}'
 ```
 
 ## Discovery flow
 
-1. `airbyte-agent workspaces list --json '{}'` — see all workspaces.
+1. `airbyte agents workspaces list --json '{}'` — see all workspaces.
 2. Note the exact `name` value.
 3. Either:
    - Pass that name into each command: `--json '{"workspace": "<name>"}'`, or
-   - Persist it as the default once: `airbyte-agent workspaces use --json '{"name": "<name>"}'`. Subsequent commands will fall back to this when `workspace` is omitted.
+   - Persist it as the default once: `airbyte agents workspaces use --json '{"name": "<name>"}'`. Subsequent commands will fall back to this when `workspace` is omitted.
 
 ## Do NOT
 

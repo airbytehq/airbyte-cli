@@ -2,7 +2,7 @@
 # Extract metadata.version from a SKILL.md YAML frontmatter block.
 #
 # Usage: scripts/skill-version.sh [path/to/SKILL.md]
-#   Default path: skills/airbyte-agent/SKILL.md
+#   Default path: skills/airbyte-agents/SKILL.md
 #   Reads from stdin when the path is "-" or "/dev/stdin".
 #
 # Prints the version string (e.g. "v0.1.1") to stdout. Exits non-zero if
@@ -10,7 +10,7 @@
 # fatal build error rather than silently producing an empty ldflag.
 set -euo pipefail
 
-path="${1:-skills/airbyte-agent/SKILL.md}"
+path="${1:-skills/airbyte-agents/SKILL.md}"
 
 version=$(awk '
   /^---[[:space:]]*$/ {

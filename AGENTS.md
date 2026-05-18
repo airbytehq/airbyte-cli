@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-`airbyte-agent` is a Go CLI for interacting with the Airbyte API. It uses a registry-based architecture where resources and operations are defined as Go structs and dynamically converted into Cobra commands at startup.
+`airbyte` is a Go CLI for interacting with the Airbyte API. It uses a registry-based architecture where resources and operations are defined as Go structs and dynamically converted into Cobra commands at startup.
 
 > [!IMPORTANT]
 > **Registry Architecture**: Commands are defined as `Resource` + `Operation` structs in `internal/resources/`, NOT as raw Cobra commands in `cmd/`. When adding a new command, implement the `Resource` interface and register it in `register.go`. Do NOT add `cobra.Command` definitions directly.
 
 > [!IMPORTANT]
-> **Skills**: A single agent skill lives at `skills/airbyte-agent/` (top-level `skills/` directory). The umbrella `SKILL.md` carries cross-command rules + a routing table; per-command playbooks live under `skills/airbyte-agent/references/<command>.md` and are loaded on demand per the [Agent Skills spec](https://agentskills.io/specification). Skills are not embedded in the binary — they are distributed separately for agent harnesses to consume.
+> **Skills**: A single agent skill lives at `skills/airbyte-agents/` (top-level `skills/` directory). The umbrella `SKILL.md` carries cross-command rules + a routing table; per-command playbooks live under `skills/airbyte-agents/references/<command>.md` and are loaded on demand per the [Agent Skills spec](https://agentskills.io/specification). Skills are not embedded in the binary — they are distributed separately for agent harnesses to consume.
 
 > [!NOTE]
 > **Minimal Dependencies**: The CLI has 3 external dependencies (Cobra + pflag + segmentio/analytics-go). Everything else is stdlib. analytics-go is the deliberate exception for telemetry — see `internal/telemetry/`. Do not add additional dependencies without strong justification.
@@ -44,13 +44,13 @@ The CLI uses a **resource-registry** pattern:
 | `internal/spec/` | OpenAPI request/response schemas (extracted at build time) |
 | `cmd/extract-schemas/` | Generator: reads `api/*.json` and emits `internal/spec/extracted_gen.go` |
 | `api/` | Checked-in OpenAPI specs (source of truth for the schema feature) |
-| `skills/` | Single agent skill at `skills/airbyte-agent/`. Umbrella `SKILL.md` + per-command playbooks under `references/<command>.md` |
+| `skills/` | Single agent skill at `skills/airbyte-agents/`. Umbrella `SKILL.md` + per-command playbooks under `references/<command>.md` |
 | `internal/client/` | HTTP client with retry logic, structured error types |
 | `internal/auth/` | Credential resolution (env -> file), OAuth token caching |
 | `internal/config/` | Environment variable configuration loader |
 | `internal/output/` | JSON output formatter |
 | `internal/telemetry/` | Segment-backed anonymous usage events. One `CLI Command Executed` event per tracked invocation. Hardcoded write key in `config.go`; tracker no-ops when key is empty, mode is disabled, or org_id is unresolved. |
-| `internal/versioncheck/` | Once-per-day GitHub Releases poll + stderr nudge when the installed CLI is behind. Cache lives at `~/.airbyte-agent/version-check.json` (24h TTL). No-ops on non-TTY stderr, dev builds, prereleases, or when the user opts out. |
+| `internal/versioncheck/` | Once-per-day GitHub Releases poll + stderr nudge when the installed CLI is behind. Cache lives at `~/.airbyte-cli/version-check.json` (24h TTL). No-ops on non-TTY stderr, dev builds, prereleases, or when the user opts out. |
 
 ### Registry (`internal/registry/`)
 
@@ -81,8 +81,8 @@ The CLI uses a **resource-registry** pattern:
 
 | File | Purpose |
 | --- | --- |
-| `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte-agent/settings.json` |
-| `credentials_file.go` | Read/write `~/.airbyte-agent/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
+| `credentials.go` | `ResolveSettings()` -- returns `Settings{Credentials, OrganizationID}`. Env vars first (all three required), then `~/.airbyte-cli/settings.json` |
+| `credentials_file.go` | Read/write `~/.airbyte-cli/settings.json` (`{settings: {credentials: {...}, organization_id: "..."}}` shape) with atomic writes and 0600 permission enforcement |
 | `token.go` | `TokenManager` -- OAuth token acquisition and caching with auto-refresh |
 | `browserlogin/` | Browser-based `login` flow: PKCE primitives (`pkce.go`, `state.go`), loopback server (`server.go`), Keycloak token exchange (`flow.go`), sonar bootstrap caller + multi-org picker (`bootstrap.go`, `picker.go`). Consumed only by `cmd/login.go`. Keycloak access/refresh tokens are transient -- discarded after the bootstrap call. |
 
@@ -91,7 +91,7 @@ The CLI uses a **resource-registry** pattern:
 | Resource | Operation | Description | Key Params |
 | --- | --- | --- | --- |
 | `organizations` | `list` | List organizations | -- |
-| `organizations` | `use` | Set the default organization in `~/.airbyte-agent/settings.json` | `id` (required) |
+| `organizations` | `use` | Set the default organization in `~/.airbyte-cli/settings.json` | `id` (required) |
 | `workspaces` | `list` | List/filter workspaces | `name_contains`, `status`, `limit` |
 | `connectors` | `list` | List workspace connectors | `workspace` (required) |
 | `connectors` | `list-available` | List connector templates | -- |
@@ -114,8 +114,8 @@ The CLI uses a **resource-registry** pattern:
 
 > [!IMPORTANT]
 > **NEVER accept credentials (API keys, tokens, passwords, secrets) directly as parameters or in chat.** Two browser-based flows handle every credential entry path:
-> - **CLI account credentials** (`client_id` / `client_secret` / `organization_id`) — handled by `airbyte-agent login`, which opens the browser to Keycloak, completes PKCE, and bootstraps the trio from the airbyte.ai bootstrap endpoints.
-> - **Connector credentials** (API keys, OAuth tokens for individual connectors) — handled by `airbyte-agent connectors create`, which opens a secure browser-based UI via an OAuth session.
+> - **CLI account credentials** (`client_id` / `client_secret` / `organization_id`) — handled by `airbyte agents login`, which opens the browser to Keycloak, completes PKCE, and bootstraps the trio from the airbyte.ai bootstrap endpoints.
+> - **Connector credentials** (API keys, OAuth tokens for individual connectors) — handled by `airbyte agents connectors create`, which opens a secure browser-based UI via an OAuth session.
 >
 > If a user offers credentials in conversation, decline and start the appropriate browser flow.
 
@@ -129,7 +129,7 @@ The CLI uses a **resource-registry** pattern:
 3. Open the browser to `https://cloud.airbyte.com/auth/realms/_airbyte-cloud-users/protocol/openid-connect/auth?...` (`flow.go`).
 4. Exchange the authorization code for a Keycloak access token at the token endpoint.
 5. Call three sonar endpoints with the access token: `/internal/account/enrollment-status`, `/internal/account/organizations` (only when needed), `/internal/account/applications` (`bootstrap.go`). The applications POST is idempotent and returns the trio.
-6. Write the trio to `~/.airbyte-agent/settings.json`. Keycloak tokens are discarded.
+6. Write the trio to `~/.airbyte-cli/settings.json`. Keycloak tokens are discarded.
 7. Use `--manual` for the legacy prompt flow (headless / no-browser environments). Use `--org-id <uuid>` to skip the multi-organization picker.
 
 > [!NOTE]
@@ -161,7 +161,7 @@ All errors are returned as JSON on stderr:
 ```
 
 > [!NOTE]
-> **Unknown commands**: Invoking an unknown command or subcommand (e.g., `airbyte-agent nothing`, `airbyte-agent connectors notarealthing`) returns an `unknown_command` error on stderr. The payload includes `available_commands` (scoped to the parent), `did_you_mean` (Levenshtein-close suggestions, omitted when empty), and a `hint` pointing at `--help`. Exit code is `4` (validation). No `status_code` / `retryable` fields — the error is local, not from the API.
+> **Unknown commands**: Invoking an unknown command or subcommand (e.g., `airbyte agents nothing`, `airbyte agents connectors notarealthing`) returns an `unknown_command` error on stderr. The payload includes `available_commands` (scoped to the parent), `did_you_mean` (Levenshtein-close suggestions, omitted when empty), and a `hint` pointing at `--help`. Exit code is `4` (validation). No `status_code` / `retryable` fields — the error is local, not from the API.
 
 ### Exit Codes
 
@@ -192,7 +192,7 @@ The HTTP client automatically retries transient failures:
 | `AIRBYTE_ORGANIZATION_ID` | Organization ID | (required) |
 | `AIRBYTE_WORKSPACE` | Default workspace name | `default` |
 
-All three are also stored in the settings file (`~/.airbyte-agent/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file. `airbyte-agent login` writes the file; the env-var precedence at runtime is unchanged by the login flow.
+All three are also stored in the settings file (`~/.airbyte-cli/settings.json`). Env-var resolution requires all three to be set; otherwise the CLI falls through to the file. `airbyte agents login` writes the file; the env-var precedence at runtime is unchanged by the login flow.
 
 ### Configuration
 
@@ -208,7 +208,7 @@ All three are also stored in the settings file (`~/.airbyte-agent/settings.json`
 | `AIRBYTE_EXECUTION_CONTEXT` | Self-reported invocation context (`mcp`, `agent`, `direct`). Emitted as the `execution_context` property on every telemetry event. | `direct` |
 | `AIRBYTE_VERSION_CHECK` | Set to `disabled` to suppress the once-per-day "new version available" nudge. Any other value (or unset) falls through to the `version_check_enabled` key in settings.json. | (settings file) |
 
-Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions):
+Settings file at `~/.airbyte-cli/settings.json` (JSON format, 0600 permissions):
 
 ```json
 {
@@ -235,7 +235,7 @@ Settings file at `~/.airbyte-agent/settings.json` (JSON format, 0600 permissions
 
 `is_internal_user` defaults to `false`. Edit the file directly (or set `AIRBYTE_INTERNAL_USER=true`) to mark an invocation as Airbyte-internal so its events can be filtered out of customer analytics.
 
-`version_check_enabled` defaults to `true` when the key is absent. When `true`, the CLI hits `https://api.github.com/repos/airbytehq/airbyte-agent-cli/releases/latest` once every 24h and prints a one-line nudge to stderr when the installed binary is behind. The check is skipped on non-TTY stderr (so scripted use doesn't see the nudge), for dev builds and prereleases, and when `AIRBYTE_VERSION_CHECK=disabled`. Cache lives at `~/.airbyte-agent/version-check.json`.
+`version_check_enabled` defaults to `true` when the key is absent. When `true`, the CLI hits `https://api.github.com/repos/airbytehq/airbyte-cli/releases/latest` once every 24h and prints a one-line nudge to stderr when the installed binary is behind. The check is skipped on non-TTY stderr (so scripted use doesn't see the nudge), for dev builds and prereleases, and when `AIRBYTE_VERSION_CHECK=disabled`. Cache lives at `~/.airbyte-cli/version-check.json`.
 
 ## Adding New Resources
 
@@ -246,19 +246,19 @@ When adding a new resource or operation:
 3. Add tests in `internal/resources/<name>_test.go` using `newTestTokenServer()` and `newTestClient()` helpers
 4. If the resource uses name-based lookup, add a `PreRun` hook for server-side ID resolution
 5. Update the **Command Surface** table in this file
-6. If the resource adds a new leaf command, add a corresponding playbook at `skills/airbyte-agent/references/<command>.md` and link it in the **Command index** table of `skills/airbyte-agent/SKILL.md`
+6. If the resource adds a new leaf command, add a corresponding playbook at `skills/airbyte-agents/references/<command>.md` and link it in the **Command index** table of `skills/airbyte-agents/SKILL.md`
 7. Set `SpecRef: registry.SpecRef{Path: "...", Method: "..."}` on each operation that maps to an OpenAPI route, then run `go generate ./...` (or `make generate`) so `internal/spec/extracted_gen.go` picks up the new route. CI fails if this file is stale.
 
 ### Adding New Skill References
 
-Per-command playbooks live as plain markdown under `skills/airbyte-agent/references/`. To add one:
+Per-command playbooks live as plain markdown under `skills/airbyte-agents/references/`. To add one:
 
-1. Create the file: `skills/airbyte-agent/references/<resource>-<operation>.md` (no YAML frontmatter — references are opened on demand by the umbrella skill).
+1. Create the file: `skills/airbyte-agents/references/<resource>-<operation>.md` (no YAML frontmatter — references are opened on demand by the umbrella skill).
 2. Lead with an H1 (`# <resource> <operation>`) and follow with task-oriented body content (when to use, usage examples, error recovery, "do NOT" guidance).
-3. Add a row to the **Command index** table in `skills/airbyte-agent/SKILL.md` pointing at the new file.
+3. Add a row to the **Command index** table in `skills/airbyte-agents/SKILL.md` pointing at the new file.
 4. Promote any cross-command rules into the **Universal rules** or **Connector rules** sections of `SKILL.md` rather than duplicating them per reference.
 5. No Go changes required — skills are not embedded in the binary.
 
 ## Skills Reference
 
-The single agent skill is at `skills/airbyte-agent/`. Browse `skills/airbyte-agent/SKILL.md` for the routing table and `skills/airbyte-agent/references/` for per-command playbooks.
+The single agent skill is at `skills/airbyte-agents/`. Browse `skills/airbyte-agents/SKILL.md` for the routing table and `skills/airbyte-agents/references/` for per-command playbooks.

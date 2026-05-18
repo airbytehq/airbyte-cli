@@ -7,9 +7,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
-	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
+	"github.com/airbytehq/airbyte-cli/internal/auth"
+	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/registry"
 )
 
 type organizationsResource struct{}
@@ -30,7 +30,7 @@ func (o *organizationsResource) Operations() []registry.Operation {
 		},
 		{
 			Name:        "use",
-			Description: "Set the default organization stored in ~/.airbyte-agent/settings.json",
+			Description: "Set the default organization stored in ~/.airbyte-cli/settings.json",
 			Schema: registry.OperationSchema{
 				Description: "Update settings.json so subsequent commands scope to this organization. The organization must exist on the authenticated account (the command verifies via the API before writing).",
 				Params: map[string]registry.ParamSchema{
@@ -50,7 +50,7 @@ func listOrganizations(ctx context.Context, c *client.Client, params map[string]
 	return raw, nil
 }
 
-// useOrganization updates Settings.OrganizationID in ~/.airbyte-agent/settings.json.
+// useOrganization updates Settings.OrganizationID in ~/.airbyte-cli/settings.json.
 // It verifies the organization exists on the authenticated account first,
 // so users can't save a typo'd or unauthorized UUID. The ID is persisted
 // exactly as it appears in the API response (UUIDs are commonly written
@@ -74,7 +74,7 @@ func useOrganization(ctx context.Context, c *client.Client, params map[string]an
 		if os.IsNotExist(err) {
 			return nil, client.NewNotFoundError(
 				"settings file does not exist",
-				"run 'airbyte-agent login' first to create ~/.airbyte-agent/settings.json",
+				"run 'airbyte agents login' first to create ~/.airbyte-cli/settings.json",
 			)
 		}
 		return nil, fmt.Errorf("reading settings: %w", err)
@@ -88,7 +88,7 @@ func useOrganization(ctx context.Context, c *client.Client, params map[string]an
 	return map[string]any{
 		"status":          "saved",
 		"organization_id": canonical,
-		"message":         fmt.Sprintf("default organization set to %q in ~/.airbyte-agent/settings.json", canonical),
+		"message":         fmt.Sprintf("default organization set to %q in ~/.airbyte-cli/settings.json", canonical),
 	}, nil
 }
 
@@ -133,6 +133,6 @@ func lookupOrganizationID(ctx context.Context, c *client.Client, id string) (str
 
 	return "", client.NewNotFoundError(
 		fmt.Sprintf("organization %q not found", id),
-		"run 'airbyte-agent organizations list' to see available organizations",
+		"run 'airbyte agents organizations list' to see available organizations",
 	)
 }

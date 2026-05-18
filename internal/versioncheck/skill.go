@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	skillDirEnv      = "AIRBYTE_AGENT_SKILLS_DIR"
+	skillDirEnv      = "AIRBYTE_SKILLS_DIR"
 	defaultSkillsDir = ".claude/skills"
-	skillName        = "airbyte-agent"
+	skillName        = "airbyte-agents"
 	skillFileName    = "SKILL.md"
 )
 
 // CheckSkill prints a one-line stderr warning when the installed
-// airbyte-agent skill is older than the version this binary was built
+// airbyte-agents skill is older than the version this binary was built
 // against. Silent in every other case: when disabled, when the output
 // stream is not a terminal, when either version is a non-release tag
 // (e.g. "dev"), when the skill file is missing, or when the installed
@@ -102,9 +102,9 @@ func installedSkillPath() string {
 
 func formatSkillNudge(installed, expected string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Your airbyte-agent skill is %s — this CLI expects %s.\n", installed, expected)
-	b.WriteString("  Reinstall with npx: npx skills add airbytehq/airbyte-agent-cli\n")
+	fmt.Fprintf(&b, "Your airbyte-agents skill is %s — this CLI expects %s.\n", installed, expected)
+	b.WriteString("  Reinstall with npx: npx skills add airbytehq/airbyte-cli\n")
 	b.WriteString("  Or reinstall via:   curl -fsSL https://airbyte.ai/install.sh | sh\n")
-	b.WriteString("  (silence: set \"version_check_enabled\": false in ~/.airbyte-agent/settings.json)\n")
+	b.WriteString("  (silence: set \"version_check_enabled\": false in ~/.airbyte-cli/settings.json)\n")
 	return b.String()
 }

@@ -3,10 +3,10 @@ package registry
 import (
 	"encoding/json"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/spec"
+	"github.com/airbytehq/airbyte-cli/internal/spec"
 )
 
-// SchemaOutput is the payload returned by `airbyte-agent schema <resource>
+// SchemaOutput is the payload returned by `airbyte agents schema <resource>
 // <operation>`. It exposes both the CLI-facing parameter shape (what the
 // user passes via --json or flags) and the underlying OpenAPI route's
 // request/response schemas (what the HTTP API accepts and returns).

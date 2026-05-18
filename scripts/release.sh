@@ -69,8 +69,8 @@ git push origin "$next"
 echo
 echo "Tag pushed. The release workflow will:"
 echo "  - build cross-platform archives"
-echo "  - create a DRAFT release at https://github.com/airbytehq/airbyte-agent-cli/releases"
-echo "  - commit Formula/airbyte-agent.rb to airbytehq/homebrew-tap"
+echo "  - create a DRAFT release at https://github.com/airbytehq/airbyte-cli/releases"
+echo "  - commit Formula/airbyte.rb to airbytehq/homebrew-tap"
 echo
-echo "Watch the run:    gh run watch --repo airbytehq/airbyte-agent-cli"
+echo "Watch the run:    gh run watch --repo airbytehq/airbyte-cli"
 echo "Publish the draft once you've eyeballed the artifacts and the formula commit."

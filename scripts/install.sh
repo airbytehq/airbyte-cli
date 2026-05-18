@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Install the airbyte-agent CLI and its agent skills.
+# Install the airbyte CLI and its agent skills.
 #
 # Usage:
 #   curl -fsSL airbyte.ai/install.sh | bash
 #
 # Environment overrides:
-#   AIRBYTE_AGENT_VERSION       Install a specific tag (e.g. v0.2.0). Default: latest release.
-#   AIRBYTE_AGENT_INSTALL_DIR   CLI target directory. Default: /usr/local/bin if writable, else $HOME/.local/bin.
-#   AIRBYTE_AGENT_SKILLS_DIR    Skills target directory. Default: $HOME/.claude/skills.
-#   AIRBYTE_AGENT_SKIP_SKILLS   Set to 1 to skip skill installation.
+#   AIRBYTE_VERSION       Install a specific tag (e.g. v0.2.0). Default: latest release.
+#   AIRBYTE_INSTALL_DIR   CLI target directory. Default: /usr/local/bin if writable, else $HOME/.local/bin.
+#   AIRBYTE_SKILLS_DIR    Skills target directory. Default: $HOME/.claude/skills.
+#   AIRBYTE_SKIP_SKILLS   Set to 1 to skip skill installation.
 #
 # Supports macOS, Linux, and WSL on amd64/arm64. Downloads the goreleaser
 # tarball from GitHub and verifies the SHA-256 against checksums.txt.
 
 set -eu
 
-REPO="airbytehq/airbyte-agent-cli"
-BINARY="airbyte-agent"
+REPO="airbytehq/airbyte-cli"
+BINARY="airbyte"
 
 if [ -t 1 ]; then
   BOLD=$(printf '\033[1m'); RED=$(printf '\033[31m')
@@ -55,19 +55,19 @@ case "$uname_m" in
   *)             die "unsupported architecture: $uname_m (supported: amd64, arm64)" ;;
 esac
 
-version="${AIRBYTE_AGENT_VERSION:-}"
+version="${AIRBYTE_VERSION:-}"
 if [ -z "$version" ]; then
   info "Looking up latest release..."
   version=$(curl -fsSL -H "Accept: application/vnd.github+json" \
     "https://api.github.com/repos/$REPO/releases/latest" \
     | sed -n 's/.*"tag_name":[[:space:]]*"\(v[^"]*\)".*/\1/p' \
     | head -n1)
-  [ -n "$version" ] || die "could not resolve latest release; set AIRBYTE_AGENT_VERSION to a tag (e.g. v0.2.0)"
+  [ -n "$version" ] || die "could not resolve latest release; set AIRBYTE_VERSION to a tag (e.g. v0.2.0)"
 fi
 case "$version" in v*) ;; *) version="v$version" ;; esac
 version_no_v="${version#v}"
 
-install_dir="${AIRBYTE_AGENT_INSTALL_DIR:-}"
+install_dir="${AIRBYTE_INSTALL_DIR:-}"
 if [ -z "$install_dir" ]; then
   if [ -d /usr/local/bin ] && [ -w /usr/local/bin ]; then
     install_dir=/usr/local/bin
@@ -76,10 +76,10 @@ if [ -z "$install_dir" ]; then
   fi
 fi
 mkdir -p "$install_dir" || die "cannot create install dir: $install_dir"
-[ -w "$install_dir" ] || die "install dir is not writable: $install_dir (set AIRBYTE_AGENT_INSTALL_DIR or rerun with sudo)"
+[ -w "$install_dir" ] || die "install dir is not writable: $install_dir (set AIRBYTE_INSTALL_DIR or rerun with sudo)"
 
-skills_dir="${AIRBYTE_AGENT_SKILLS_DIR:-$HOME/.claude/skills}"
-skip_skills="${AIRBYTE_AGENT_SKIP_SKILLS:-0}"
+skills_dir="${AIRBYTE_SKILLS_DIR:-$HOME/.claude/skills}"
+skip_skills="${AIRBYTE_SKIP_SKILLS:-0}"
 
 archive="${BINARY}_${version_no_v}_${os}_${arch}.tar.gz"
 base_url="https://github.com/$REPO/releases/download/$version"
@@ -129,12 +129,12 @@ ok "Installed ${BOLD}$BINARY $version${RESET} to $target"
 
 installed_skills=0
 if [ "$skip_skills" = "1" ] || [ "$skip_skills" = "true" ]; then
-  info "Skipping skills (AIRBYTE_AGENT_SKIP_SKILLS set)."
+  info "Skipping skills (AIRBYTE_SKIP_SKILLS set)."
 else
   info ""
   info "Installing skills to $skills_dir..."
   mkdir -p "$skills_dir" || die "cannot create skills dir: $skills_dir"
-  [ -w "$skills_dir" ] || die "skills dir is not writable: $skills_dir (set AIRBYTE_AGENT_SKILLS_DIR)"
+  [ -w "$skills_dir" ] || die "skills dir is not writable: $skills_dir (set AIRBYTE_SKILLS_DIR)"
 
   src_tarball="$tmp/source.tar.gz"
   if ! curl -fsSL --proto '=https' --tlsv1.2 -o "$src_tarball" "$source_url"; then
@@ -145,7 +145,7 @@ else
     if ! tar -xzf "$src_tarball" -C "$src_dir"; then
       warn "could not extract source tarball; skipping skills"
     else
-      # Tarball extracts to a single top-level dir like airbyte-agent-cli-0.2.0
+      # Tarball extracts to a single top-level dir like airbyte-cli-0.2.0
       skills_src=$(find "$src_dir" -mindepth 2 -maxdepth 2 -type d -name skills | head -n1)
       if [ -z "$skills_src" ] || [ ! -d "$skills_src" ]; then
         warn "no skills/ directory found in source tarball; skipping"
@@ -169,7 +169,7 @@ fi
 info ""
 case ":$PATH:" in
   *":$install_dir:"*)
-    info "Run ${BOLD}$BINARY login${RESET} to authenticate."
+    info "Run ${BOLD}$BINARY agents login${RESET} to authenticate."
     ;;
   *)
     warn "$install_dir is not on your PATH."
@@ -177,6 +177,6 @@ case ":$PATH:" in
     info ""
     info "    export PATH=\"$install_dir:\$PATH\""
     info ""
-    info "Then run ${BOLD}$BINARY login${RESET} to authenticate."
+    info "Then run ${BOLD}$BINARY agents login${RESET} to authenticate."
     ;;
 esac
