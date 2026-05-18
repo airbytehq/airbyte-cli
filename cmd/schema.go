@@ -36,7 +36,7 @@ without making an API call.`,
 						client.ExitNotFound,
 					)
 				}
-				return outputpkg.WriteJSON(os.Stdout, registry.BuildSchemaOutput(op))
+				return outputpkg.Write(registry.BuildSchemaOutput(op), output)
 			}
 		}
 		return writeSchemaError("not_found", fmt.Sprintf("operation %q not found on resource %q", opName, resourceName), client.ExitNotFound)

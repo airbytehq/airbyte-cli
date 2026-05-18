@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -14,10 +15,16 @@ var (
 )
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the CLI version",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(Version)
+	Use:          "version",
+	Short:        "Print the CLI version",
+	SilenceUsage: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		line := Version + "\n"
+		if output != "" {
+			return os.WriteFile(output, []byte(line), 0o644)
+		}
+		fmt.Print(line)
+		return nil
 	},
 }
 
