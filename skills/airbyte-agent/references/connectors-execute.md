@@ -79,6 +79,9 @@ If `execute` returns `validation_error` on `entity` or `action`, you guessed —
 
 To paginate, pass `cursor=<last_cursor_value>` in `params` while `has_more` is true.
 
+> [!IMPORTANT]
+> **Read the full response. Never truncate.** Run `execute` directly and read the entire stdout as one result. Do NOT pipe through `head`, `tail`, `sed`, `awk`, `cut`, `wc`, or any other tool that drops bytes, and do NOT cap output with `--fields` solely to make it shorter. If the response is large, that *is* the answer — narrow the query (`select_fields`, tighter filters, smaller `limit`) at the source rather than slicing the output after the fact. Truncated output silently hides records, `has_more`, errors, and pagination cursors.
+
 ## How to use `context_store_search`
 
 `action=context_store_search` reads `params.query` with `filter`, `sort`, and `limit`:
@@ -218,3 +221,4 @@ airbyte-agent connectors execute --fields data.id,data.email,meta.has_more --jso
 - Do NOT paginate beyond 3 pages — narrow the filter instead.
 - Do NOT pass relative dates ("today", "last week") — resolve to absolute ISO 8601 timestamps and report the range to the user.
 - Do NOT silently retry write failures against a different target.
+- Do NOT truncate the `execute` response or pipe it through `head`/`tail`/`sed`/`awk`/`cut`/`wc` — read the full output. If it's too large, narrow the query (`select_fields`, filters, `limit`); don't slice the result.
