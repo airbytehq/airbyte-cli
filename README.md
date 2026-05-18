@@ -28,7 +28,7 @@ Environment overrides:
 ### Homebrew (macOS, Linux)
 
 ```bash
-brew install airbytehq/tap/airbyte
+brew install airbytehq/tap/airbyte-cli
 ```
 
 ### Manual binary download
@@ -277,7 +277,7 @@ To add a new resource: implement the `Resource` interface in `internal/resources
 
 ## Releases
 
-Releases are cut by pushing a `v*` tag. The `release` workflow builds binaries for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted) via [goreleaser](https://goreleaser.com), uploads them as a draft GitHub release, and commits an updated `Formula/airbyte.rb` to [airbytehq/homebrew-tap](https://github.com/airbytehq/homebrew-tap).
+Releases are cut by pushing a `v*` tag. The `release` workflow builds binaries for `linux`/`darwin`/`windows` × `amd64`/`arm64` (Windows arm64 excepted) via [goreleaser](https://goreleaser.com), uploads them as a draft GitHub release, and commits an updated `Formula/airbyte-cli.rb` to [airbytehq/homebrew-tap](https://github.com/airbytehq/homebrew-tap).
 
 ### Versioning
 
@@ -303,13 +303,13 @@ Pre-releases use a suffix (`v0.2.0-rc1`, `v0.2.0-beta`); goreleaser publishes th
 
 3. **Watch the release workflow.** It runs in two halves:
    - Builds + uploads a **draft** GitHub release (binaries, archives, `checksums.txt`).
-   - Commits `Formula/airbyte.rb` to `airbytehq/homebrew-tap@main`.
+   - Commits `Formula/airbyte-cli.rb` to `airbytehq/homebrew-tap@main`.
 4. **Review the draft release.** Open it in the GitHub UI, check the auto-generated changelog, and either edit the notes or accept them.
 5. **Click Publish.** This is intentional manual gating — easy to catch a misconfigured formula or stale changelog before users see it.
 6. **Smoke-test the install** on a fresh machine:
 
    ```bash
-   brew install airbytehq/tap/airbyte
+   brew install airbytehq/tap/airbyte-cli
    airbyte agents version
    ```
 
@@ -320,7 +320,7 @@ Validate the release pipeline locally without pushing anything:
 ```bash
 goreleaser check                    # validates .goreleaser.yaml
 goreleaser release --snapshot --clean
-# inspect dist/ — binaries, archives, and dist/homebrew/Formula/airbyte.rb
+# inspect dist/ — binaries, archives, and dist/homebrew/Formula/airbyte-cli.rb
 ```
 
 The snapshot run produces real artifacts in `dist/` so you can confirm the formula renders correctly and the version-stamped ldflags resolve as expected. Nothing is uploaded.
@@ -329,7 +329,7 @@ The snapshot run produces real artifacts in `dist/` so you can confirm the formu
 
 - **Bad binaries, formula not yet committed.** Delete the draft release in the GitHub UI, delete the tag locally and remotely (`git tag -d v0.1.0 && git push origin :refs/tags/v0.1.0`), fix, retag.
 - **Formula already committed but binaries broken.** Delete the formula commit on `homebrew-tap` (open a one-line revert PR), then retag a new patch version. Don't re-use the same tag.
-- **Need to yank a published release.** Delete the formula commit on `homebrew-tap`. Existing `brew install`s won't rollback automatically; users with the broken version will keep it until they `brew upgrade airbyte`. Consider a `0.x.y+1` patch release rather than a yank when possible — fewer surprises for users.
+- **Need to yank a published release.** Delete the formula commit on `homebrew-tap`. Existing `brew install`s won't rollback automatically; users with the broken version will keep it until they `brew upgrade airbyte-cli`. Consider a `0.x.y+1` patch release rather than a yank when possible — fewer surprises for users.
 
 ## License
 
