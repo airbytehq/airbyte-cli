@@ -52,7 +52,7 @@ jobs:
           # uploads archives, the source bundle, and the checksums file here.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Cross-repo token (App-minted): lets goreleaser commit
-          # Formula/airbyte.rb to airbytehq/homebrew-tap.
+          # Formula/airbyte-cli.rb to airbytehq/homebrew-tap.
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ steps.get-app-token.outputs.token }}
           # Skill version stamped into the binary via cmd.ExpectedSkillVersion.
           # Sourced from skills/airbyte-agents/SKILL.md by the previous step.

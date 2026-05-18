@@ -64,17 +64,20 @@ release:
   prerelease: auto
   name_template: "v{{ .Version }}"
 
-# Homebrew formula generation. Goreleaser commits Formula/airbyte.rb to the
-# airbytehq/homebrew-tap repo on each non-prerelease release. Cross-repo write
-# requires a separate token (HOMEBREW_TAP_GITHUB_TOKEN) — the default
+# Homebrew formula generation. Goreleaser commits Formula/airbyte-cli.rb to
+# the airbytehq/homebrew-tap repo on each non-prerelease release. Cross-repo
+# write requires a separate token (HOMEBREW_TAP_GITHUB_TOKEN) — the default
 # GITHUB_TOKEN issued by the workflow only has access to this repo.
 #
 # Note: `brews` is deprecated in goreleaser in favor of `homebrew_casks`. We are
 # intentionally still using `brews` because casks are intended for signed/notarized
 # macOS binaries and our binaries are unsigned. Revisit when goreleaser removes
 # `brews` entirely or when we start signing release binaries.
+#
+# Formula is named `airbyte-cli` (to match the repo); the installed binary
+# is `airbyte` (short, what users actually type).
 brews:
-  - name: airbyte
+  - name: airbyte-cli
     repository:
       owner: airbytehq
       name: homebrew-tap

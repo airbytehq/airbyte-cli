@@ -113,7 +113,7 @@ func maybeNudge(currentRaw string, current semver, c *cacheFile, stderr io.Write
 func formatNudge(current, latest, releaseURL string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "A new version of the airbyte CLI is available: %s (you have %s)\n", latest, current)
-	b.WriteString("  Upgrade with brew: brew upgrade airbyte\n")
+	b.WriteString("  Upgrade with brew: brew upgrade airbyte-cli\n")
 	b.WriteString("  Or reinstall:      curl -fsSL https://airbyte.ai/install.sh | sh\n")
 	if releaseURL != "" {
 		fmt.Fprintf(&b, "  Release notes:     %s\n", releaseURL)

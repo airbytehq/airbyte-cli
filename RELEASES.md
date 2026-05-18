@@ -39,7 +39,7 @@ The script does **not** publish anything itself — pushing the tag is what trig
 2. Runs `goreleaser release --clean`, which:
    - Builds cross-platform binaries (linux/darwin/windows × amd64/arm64).
    - Creates a **draft** GitHub release in `airbyte-cli` with the archives and `checksums.txt` attached.
-   - Commits an updated `Formula/airbyte.rb` directly to `main` on `airbytehq/homebrew-tap`.
+   - Commits an updated `Formula/airbyte-cli.rb` directly to `main` on `airbytehq/homebrew-tap`.
 
 Prerelease tags (e.g. `v0.1.0-rc1`) are detected automatically: the GitHub release is still created (as a prerelease draft) but the brew formula commit is **skipped** (`skip_upload: auto` in `.goreleaser.yaml`).
 
@@ -57,7 +57,7 @@ Two ways to publish:
 gh release edit vX.Y.Z --draft=false --repo airbytehq/airbyte-cli
 ```
 
-Once published, the tarball URLs in the brew formula resolve and `brew install airbytehq/tap/airbyte` works. Before publishing, those URLs return 404 to anonymous requests (which is what `brew` makes).
+Once published, the tarball URLs in the brew formula resolve and `brew install airbytehq/tap/airbyte-cli` works. Before publishing, those URLs return 404 to anonymous requests (which is what `brew` makes).
 
 ## Removing a tag
 
@@ -76,7 +76,7 @@ git tag -d vX.Y.Z
 git push origin :refs/tags/vX.Y.Z
 ```
 
-**3. Revert the formula commit on `homebrew-tap`** if goreleaser already pushed one. Find the bump commit in `https://github.com/airbytehq/homebrew-tap/commits/main` and revert it (or push a follow-up commit restoring the previous formula). If this is the first release, just delete `Formula/airbyte.rb` from the tap.
+**3. Revert the formula commit on `homebrew-tap`** if goreleaser already pushed one. Find the bump commit in `https://github.com/airbytehq/homebrew-tap/commits/main` and revert it (or push a follow-up commit restoring the previous formula). If this is the first release, just delete `Formula/airbyte-cli.rb` from the tap.
 
 **4. Re-run the release script** when ready:
 

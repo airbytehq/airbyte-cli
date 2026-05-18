@@ -2,13 +2,13 @@
 name: airbyte-agents
 description: Drive the `airbyte agents` CLI namespace to manage Airbyte connectors, workspaces, and organizations. Run list/get/search/create/update actions against connector data (HubSpot, Salesforce, Slack, GitHub, etc.), install new connectors via the browser credential flow, list and switch workspaces, list organizations, inspect a connector's entities and actions, or print the merged CLI + OpenAPI schema for any operation. Use when the user mentions Airbyte, the `airbyte` CLI, connectors, syncs, workspaces, organizations, or asks to read/write data from a connected SaaS product.
 metadata:
-  version: "v0.1.3"
+  version: "v0.1.0"
 ---
 
 # airbyte agents
 
 > [!NOTE]
-> Requires the `airbyte` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte` or `curl -fsSL https://airbyte.ai/install.sh | bash`. See the [project README](https://github.com/airbytehq/airbyte-cli#install) for other options.
+> Requires the `airbyte` CLI on `PATH`. Install via `brew install airbytehq/tap/airbyte-cli` or `curl -fsSL https://airbyte.ai/install.sh | bash`. See the [project README](https://github.com/airbytehq/airbyte-cli#install) for other options.
 
 The CLI is invoked as `airbyte agents <resource> <operation>`. It exposes Airbyte's data plane through a uniform interface — every command takes a JSON payload and returns JSON.
 
