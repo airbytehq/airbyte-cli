@@ -19,9 +19,8 @@ and response schema.
 
 Use it when you want agents to find the introspection surface for an operation
 without making an API call.`,
-	Args:          cobra.ExactArgs(2),
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	Args:         cobra.ExactArgs(2),
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		resourceName, opName := args[0], args[1]
 		res, ok := registry.Get(resourceName)

@@ -26,7 +26,7 @@ func (w *workspacesResource) Operations() []registry.Operation {
 				Params: map[string]registry.ParamSchema{
 					"name_contains": {Type: "string", Required: false, Description: "Filter by name substring"},
 					"status":        {Type: "string", Required: false, Description: "Filter by status"},
-					"limit":         {Type: "integer", Required: false, Description: "Max results per page"},
+					"limit":         {Type: "integer", Required: false, Description: "Max total results to return"},
 				},
 			},
 			SpecRef: registry.SpecRef{Path: "/api/v1/workspaces", Method: "GET"},
@@ -129,8 +129,18 @@ func listWorkspaces(ctx context.Context, c *client.Client, params map[string]any
 	if v, ok := params["status"].(string); ok && v != "" {
 		qp["status"] = v
 	}
-	if v, ok := params["limit"]; ok {
-		qp["limit"] = fmt.Sprintf("%v", v)
+
+	var limit int
+	switch n := params["limit"].(type) {
+	case float64:
+		limit = int(n)
+	case int:
+		limit = n
+	case int64:
+		limit = int(n)
+	}
+	if limit > 0 {
+		qp["limit"] = fmt.Sprintf("%d", limit)
 	}
 
 	var allData []json.RawMessage
@@ -147,6 +157,11 @@ func listWorkspaces(ctx context.Context, c *client.Client, params map[string]any
 		}
 
 		allData = append(allData, page.Data...)
+
+		if limit > 0 && len(allData) >= limit {
+			allData = allData[:limit]
+			break
+		}
 
 		if page.Next == nil || *page.Next == "" {
 			break

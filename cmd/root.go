@@ -21,8 +21,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		printSplash(os.Stdout)
 	},
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	SilenceUsage: true,
 }
 
 func init() {

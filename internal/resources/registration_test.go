@@ -277,6 +277,53 @@ func TestWorkspacesListPagination(t *testing.T) {
 	}
 }
 
+func TestWorkspacesListLimit_CapsTotalAndStopsPagination(t *testing.T) {
+	callCount := 0
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		callCount++
+		if callCount == 1 {
+			if got := r.URL.Query().Get("limit"); got != "2" {
+				t.Errorf("expected limit=2 forwarded to API, got %q", got)
+			}
+			next := "http://" + r.Host + "/api/v1/workspaces?cursor=page2"
+			resp := map[string]any{
+				"data": []map[string]string{{"name": "ws-1"}, {"name": "ws-2"}, {"name": "ws-3"}},
+				"next": next,
+			}
+			_ = json.NewEncoder(w).Encode(resp)
+			return
+		}
+		t.Errorf("pagination should have stopped after first page, got call %d", callCount)
+		_ = json.NewEncoder(w).Encode(map[string]any{"data": []map[string]string{}, "next": nil})
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	// JSON-decoded numbers arrive as float64; mirror that here.
+	result, err := listWorkspaces(context.Background(), c, map[string]any{"limit": float64(2)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected map[string]any, got %T", result)
+	}
+	data, ok := resultMap["data"].([]json.RawMessage)
+	if !ok {
+		t.Fatalf("expected []json.RawMessage, got %T", resultMap["data"])
+	}
+	if len(data) != 2 {
+		t.Fatalf("expected limit=2 to cap results to 2, got %d", len(data))
+	}
+	if callCount != 1 {
+		t.Errorf("expected exactly 1 API call once limit was reached, got %d", callCount)
+	}
+}
+
 func TestUseWorkspace_UpdatesSettingsFile(t *testing.T) {
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
