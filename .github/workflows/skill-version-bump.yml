@@ -20,6 +20,13 @@ jobs:
         run: |
           set -euo pipefail
           head=$(./scripts/skill-version.sh)
+          # v0.1.0 is the documented bootstrap/reset version. Accept it
+          # regardless of the base branch so deliberate resets (e.g. after a
+          # namespace rename) don't require bypassing the check.
+          if [ "$head" = "v0.1.0" ]; then
+            echo "::notice::Head is v0.1.0 — treating as bootstrap/reset."
+            exit 0
+          fi
           if ! base=$(git show "origin/${{ github.base_ref }}":skills/airbyte-agents/SKILL.md 2>/dev/null | ./scripts/skill-version.sh /dev/stdin 2>/dev/null); then
             echo "::notice::Base branch has no skill version yet — accepting head=$head as the bootstrap."
             exit 0
