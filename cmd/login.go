@@ -53,8 +53,7 @@ The workspace is used as the fallback for any command that takes a
 'workspace' parameter when one isn't supplied. The browser flow does not
 prompt for a workspace; if you need to change yours, edit
 ~/.airbyte-agent/settings.json directly or use 'workspaces use'.`,
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
 		ctx := cmd.Context()
@@ -114,8 +113,7 @@ so the output is safe to paste into a bug report or share for debugging.
 This command reads the file directly, not the runtime resolved settings.
 If you have AIRBYTE_* environment variables set, they may override what's
 shown here when the CLI actually makes API calls.`,
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		settings, err := auth.ReadSettingsFile()
 		if err != nil {

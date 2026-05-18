@@ -206,8 +206,7 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 
 			return writeResult(result, flags)
 		},
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		SilenceUsage: true,
 	}
 
 	cmd.Flags().StringVar(&jsonInput, "json", "", "Input parameters as JSON (or @filename to read from file). Cannot be combined with parameter flags.")
