@@ -138,7 +138,7 @@ Use this baseline plus the untracked-file snapshot for every later `git diff`, `
 ```
 Agent(subagent_type="general-purpose",
   description="Implement Phase [N]: [Name]",
-  prompt="Implement Phase [N]: [Name] of the airbyte agents CLI plan.
+  prompt="Implement Phase [N]: [Name] of the airbyte CLI plan.
 
 ## Plan Section
 [Paste the phase's plan content here]
