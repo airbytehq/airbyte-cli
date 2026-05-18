@@ -1,7 +1,7 @@
 // Package versioncheck prints a one-line nudge to stderr when a newer
-// release of airbyte-agent is available on GitHub.
+// release of airbyte agents is available on GitHub.
 //
-// The check is cached at ~/.airbyte-agent/version-check.json with a 24h
+// The check is cached at ~/.airbyte-cli/version-check.json with a 24h
 // TTL so a typical run does no network I/O. The first run on a fresh
 // install fetches synchronously with a 1s timeout so the nudge can appear
 // on that run; subsequent stale-cache refreshes happen in a background
@@ -24,7 +24,7 @@ import (
 )
 
 const (
-	cacheDirName  = ".airbyte-agent"
+	cacheDirName  = ".airbyte-cli"
 	cacheFileName = "version-check.json"
 	cacheFileMode = 0o600
 	cacheDirMode  = 0o700
@@ -34,7 +34,7 @@ const (
 )
 
 // githubReleasesURL is overridable in tests.
-var githubReleasesURL = "https://api.github.com/repos/airbytehq/airbyte-agent-cli/releases/latest"
+var githubReleasesURL = "https://api.github.com/repos/airbytehq/airbyte-cli/releases/latest"
 
 type cacheFile struct {
 	LatestVersion string    `json:"latest_version"`
@@ -112,13 +112,13 @@ func maybeNudge(currentRaw string, current semver, c *cacheFile, stderr io.Write
 
 func formatNudge(current, latest, releaseURL string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "A new version of airbyte-agent is available: %s (you have %s)\n", latest, current)
-	b.WriteString("  Upgrade with brew: brew upgrade airbyte-agent\n")
+	fmt.Fprintf(&b, "A new version of the airbyte CLI is available: %s (you have %s)\n", latest, current)
+	b.WriteString("  Upgrade with brew: brew upgrade airbyte\n")
 	b.WriteString("  Or reinstall:      curl -fsSL https://airbyte.ai/install.sh | sh\n")
 	if releaseURL != "" {
 		fmt.Fprintf(&b, "  Release notes:     %s\n", releaseURL)
 	}
-	b.WriteString("  (silence: set \"version_check_enabled\": false in ~/.airbyte-agent/settings.json)\n")
+	b.WriteString("  (silence: set \"version_check_enabled\": false in ~/.airbyte-cli/settings.json)\n")
 	return b.String()
 }
 
@@ -149,7 +149,7 @@ func fetchLatest(ctx context.Context) (*cacheFile, error) {
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "airbyte-agent-cli")
+	req.Header.Set("User-Agent", "airbyte-cli")
 
 	client := &http.Client{Timeout: networkTimeout}
 	resp, err := client.Do(req)

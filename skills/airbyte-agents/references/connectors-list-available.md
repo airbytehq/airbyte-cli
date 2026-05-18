@@ -5,7 +5,7 @@ List the connector templates available to install in this account. Each template
 ## Usage
 
 ```bash
-airbyte-agent connectors list-available --json '{}'
+airbyte agents connectors list-available --json '{}'
 ```
 
 ## When to use
@@ -15,15 +15,15 @@ Always run this **before** `connectors create` to discover the exact template `n
 ## Workflow
 
 ```bash
-airbyte-agent connectors list-available --json '{}'
-airbyte-agent connectors create --json '{"workspace": "my-workspace", "name": "salesforce"}'
+airbyte agents connectors list-available --json '{}'
+airbyte agents connectors create --json '{"workspace": "my-workspace", "name": "salesforce"}'
 ```
 
 ## Filtering output
 
 ```bash
-airbyte-agent connectors list-available --fields id,name --json '{}'              # short form
-airbyte-agent connectors list-available --fields data.id,data.name --json '{}'    # long form
+airbyte agents connectors list-available --fields id,name --json '{}'              # short form
+airbyte agents connectors list-available --fields data.id,data.name --json '{}'    # long form
 ```
 
 ## Hints

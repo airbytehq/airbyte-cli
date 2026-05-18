@@ -7,7 +7,7 @@ model: opus
 
 <!-- ultrathink -->
 
-You are tasked with implementing an approved plan from `thoughts/shared/plans/` (or the project root). Execute the plan phase-by-phase with verification checkpoints in the `airbyte-agent` CLI codebase.
+You are tasked with implementing an approved plan from `thoughts/shared/plans/` (or the project root). Execute the plan phase-by-phase with verification checkpoints in the `airbyte` CLI codebase.
 
 ## Plan Reference
 
@@ -138,7 +138,7 @@ Use this baseline plus the untracked-file snapshot for every later `git diff`, `
 ```
 Agent(subagent_type="general-purpose",
   description="Implement Phase [N]: [Name]",
-  prompt="Implement Phase [N]: [Name] of the airbyte-agent CLI plan.
+  prompt="Implement Phase [N]: [Name] of the airbyte CLI plan.
 
 ## Plan Section
 [Paste the phase's plan content here]
@@ -292,7 +292,7 @@ Then report:
 - Confirm Final Verification passed (gofmt clean, vet clean, build green, full test suite green)
 - Confirm `internal/spec/extracted_gen.go` is up to date if `SpecRef` changed
 - List any remaining manual verification items from the plan
-- Offer to create a commit, run additional probe commands (e.g., `./airbyte-agent <new-cmd> --describe`), or other next steps
+- Offer to create a commit, run additional probe commands (e.g., `./airbyte agents <new-cmd> --describe`), or other next steps
 
 ## Important Guidelines
 

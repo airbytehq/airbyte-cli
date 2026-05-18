@@ -18,7 +18,7 @@ const validSettingsJSON = `{
 
 func writeSettings(t *testing.T, tmpDir, body string) {
 	t.Helper()
-	dir := filepath.Join(tmpDir, ".airbyte-agent")
+	dir := filepath.Join(tmpDir, ".airbyte-cli")
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		t.Fatalf("creating dir: %v", err)
 	}
@@ -167,7 +167,7 @@ func TestSettingsFile_RoundTrip(t *testing.T) {
 		t.Fatalf("writing: %v", err)
 	}
 
-	path := filepath.Join(tmpDir, ".airbyte-agent", "settings.json")
+	path := filepath.Join(tmpDir, ".airbyte-cli", "settings.json")
 	info, err := os.Stat(path)
 	if err != nil {
 		t.Fatalf("stat: %v", err)
@@ -285,7 +285,7 @@ func TestSettingsFile_PreservesNestedStructure(t *testing.T) {
 		t.Fatalf("writing: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(tmpDir, ".airbyte-agent", "settings.json"))
+	data, err := os.ReadFile(filepath.Join(tmpDir, ".airbyte-cli", "settings.json"))
 	if err != nil {
 		t.Fatalf("reading raw: %v", err)
 	}

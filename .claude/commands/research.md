@@ -6,7 +6,7 @@ description: Research the codebase to understand how something works
 
 <!-- ultrathink -->
 
-You are tasked with conducting comprehensive research across the `airbyte-agent` CLI codebase to answer the user's question by spawning parallel sub-agents and synthesizing their findings.
+You are tasked with conducting comprehensive research across the `airbyte` CLI codebase to answer the user's question by spawning parallel sub-agents and synthesizing their findings.
 
 ## Research Question
 
@@ -70,7 +70,7 @@ Break down the research question into:
 | References `Resource`, `Operation`, `Register`, command surface, adding commands | **Resources** (`internal/resources/`) |
 | References `registry.Build`, Cobra flag generation, `--describe`, `--json`, `OperationHooks`, `ParamSchema` | **Registry** (`internal/registry/`) |
 | References HTTP, retries, `APIError`, status codes, `Get/Post/Patch/Delete` | **Client** (`internal/client/`) |
-| References credentials, OAuth, token caching, settings file, `~/.airbyte-agent/` | **Auth** (`internal/auth/`) |
+| References credentials, OAuth, token caching, settings file, `~/.airbyte-cli/` | **Auth** (`internal/auth/`) |
 | References `SKILL.md`, `skills/<command>/`, frontmatter | **Skills** (`skills/`) |
 | References `--format`, JSON/table output, `--fields`, `writeResult` | **Output** (`internal/output/`) |
 | References telemetry, Segment, `CLI Command Executed`, `is_internal_user` | **Telemetry** (`internal/telemetry/`) |
@@ -94,7 +94,7 @@ mkdir -p "$RESEARCH_TMP_DIR"
 ```
 Agent(subagent_type="Explore",
   description="Locate files for [topic]",
-  prompt="Find all files related to [topic] in the airbyte-agent CLI.
+  prompt="Find all files related to [topic] in the airbyte agents CLI.
 Look in cmd/, internal/registry/, internal/resources/, internal/client/, internal/auth/,
 internal/config/, internal/output/, internal/spec/, internal/telemetry/, skills/, api/.
 Return a categorized list: implementation files, test files (*_test.go), generated files
@@ -109,7 +109,7 @@ Use markdown format with file paths and brief descriptions.")
 ```
 Agent(subagent_type="general-purpose",
   description="Analyze how [topic] works",
-  prompt="Analyze how [topic] works in the airbyte-agent CLI.
+  prompt="Analyze how [topic] works in the airbyte agents CLI.
 Read the relevant Go files and trace the code path from main.go through the
 registry builder into the operation's Run function (and any PreRun hooks).
 Document with file:line references.
@@ -126,7 +126,7 @@ Use markdown format with file:line references.")
 ```
 Agent(subagent_type="general-purpose",
   description="Find patterns matching [topic]",
-  prompt="Find existing examples of [pattern type] in the airbyte-agent CLI.
+  prompt="Find existing examples of [pattern type] in the airbyte agents CLI.
 Look at how other resources in internal/resources/ implement the same Resource/Operation
 interface — workspaces.go, organizations.go, and connectors.go are good reference points.
 Look at how their tests in *_test.go use newTestTokenServer() and newTestClient() helpers.
@@ -169,7 +169,7 @@ Focus on:
   (3x exponential backoff on 429/502/503/504), 30s timeout, X-ADP-Agent-CLI header
 - internal/client/errors.go: APIError struct, ExitCode() mapping (auth=2, not-found=3, validation=4)
 - internal/auth/credentials.go: ResolveSettings — env vars first (all three required),
-  then ~/.airbyte-agent/settings.json
+  then ~/.airbyte-cli/settings.json
 - internal/auth/credentials_file.go: atomic writes, 0600 permission enforcement
 - internal/auth/token.go: TokenManager OAuth caching and auto-refresh
 
@@ -200,7 +200,7 @@ Use markdown format with file:line references.")
 ```
 Agent(subagent_type="general-purpose",
   description="Cross-cutting analysis of [topic]",
-  prompt="Analyze how [topic] interacts across the airbyte-agent CLI's packages.
+  prompt="Analyze how [topic] interacts across the airbyte agents CLI's packages.
 Trace the flow from main.go (config -> auth -> client -> registry -> Cobra) through
 the relevant packages. Identify which packages collaborate and via what interfaces.
 

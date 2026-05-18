@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
-	"github.com/airbytehq/airbyte-agent-cli/internal/output"
-	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
+	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/output"
+	"github.com/airbytehq/airbyte-cli/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -180,7 +180,7 @@ func buildOperationCmd(op *Operation, c *client.Client, flags flagAccessor) *cob
 					Type:       "auth_error",
 					Message:    "no credentials configured",
 					StatusCode: 401,
-					Hint:       "run 'airbyte-agent login' to configure credentials interactively, set AIRBYTE_CLIENT_ID/AIRBYTE_CLIENT_SECRET/AIRBYTE_ORGANIZATION_ID environment variables, or populate ~/.airbyte-agent/settings.json",
+					Hint:       "run 'airbyte agents login' to configure credentials interactively, set AIRBYTE_CLIENT_ID/AIRBYTE_CLIENT_SECRET/AIRBYTE_ORGANIZATION_ID environment variables, or populate ~/.airbyte-cli/settings.json",
 				})
 			}
 
@@ -401,7 +401,7 @@ func validateParams(params map[string]any, schema OperationSchema) error {
 		errPayload := map[string]any{
 			"type":   "validation_error",
 			"fields": fields,
-			"hint":   "run `airbyte-agent schema <resource> <operation>` to see the expected parameter schema",
+			"hint":   "run `airbyte agents schema <resource> <operation>` to see the expected parameter schema",
 		}
 		writeStderrJSON(errPayload)
 		osExit(client.ExitValidation)

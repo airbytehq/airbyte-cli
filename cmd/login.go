@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth/browserlogin"
-	"github.com/airbytehq/airbyte-agent-cli/internal/client"
-	"github.com/airbytehq/airbyte-agent-cli/internal/config"
-	outputpkg "github.com/airbytehq/airbyte-agent-cli/internal/output"
-	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
+	"github.com/airbytehq/airbyte-cli/internal/auth"
+	"github.com/airbytehq/airbyte-cli/internal/auth/browserlogin"
+	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-cli/internal/config"
+	outputpkg "github.com/airbytehq/airbyte-cli/internal/output"
+	"github.com/airbytehq/airbyte-cli/internal/telemetry"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -43,7 +43,7 @@ var loginCmd = &cobra.Command{
 	Long: `Sign in to airbyte.ai. By default this opens your browser to complete
 the Keycloak login, then bootstraps your client_id, client_secret, and
 organization_id from the airbyte.ai bootstrap endpoints and writes them to
-~/.airbyte-agent/settings.json with 0600 permissions.
+~/.airbyte-cli/settings.json with 0600 permissions.
 
 Use --manual for the legacy prompt-based flow (useful when no browser is
 available, e.g. on a headless server). Use --org-id <uuid> to skip the
@@ -52,7 +52,7 @@ multi-organization picker when you belong to more than one organization.
 The workspace is used as the fallback for any command that takes a
 'workspace' parameter when one isn't supplied. The browser flow does not
 prompt for a workspace; if you need to change yours, edit
-~/.airbyte-agent/settings.json directly or use 'workspaces use'.`,
+~/.airbyte-cli/settings.json directly or use 'workspaces use'.`,
 	SilenceUsage: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		start := time.Now()
@@ -87,7 +87,7 @@ prompt for a workspace; if you need to change yours, edit
 
 		existing, _ := auth.ReadSettingsFile() // nil when the file doesn't exist
 		merged := mergePreservedSettings(existing, fresh)
-		fmt.Fprintln(os.Stderr, "Saving credentials to ~/.airbyte-agent/settings.json…")
+		fmt.Fprintln(os.Stderr, "Saving credentials to ~/.airbyte-cli/settings.json…")
 		if werr := auth.WriteSettingsFile(merged); werr != nil {
 			emitLoginTelemetry(start, merged.OrganizationID, false, "write_settings")
 			outputpkg.WriteError(map[string]any{"type": "error", "message": werr.Error()})
@@ -98,7 +98,7 @@ prompt for a workspace; if you need to change yours, edit
 
 		return outputpkg.Write(map[string]string{
 			"status":  "saved",
-			"message": "Settings written to ~/.airbyte-agent/settings.json",
+			"message": "Settings written to ~/.airbyte-cli/settings.json",
 		}, output)
 	},
 }
@@ -106,7 +106,7 @@ prompt for a workspace; if you need to change yours, edit
 var loginShowCmd = &cobra.Command{
 	Use:   "show",
 	Short: "Print the saved settings (with the client secret obfuscated)",
-	Long: `Read ~/.airbyte-agent/settings.json and print its contents as JSON. The
+	Long: `Read ~/.airbyte-cli/settings.json and print its contents as JSON. The
 client_secret is obfuscated — only the trailing characters are visible —
 so the output is safe to paste into a bug report or share for debugging.
 
@@ -121,7 +121,7 @@ shown here when the CLI actually makes API calls.`,
 				outputpkg.WriteError(map[string]any{
 					"type":    "not_found",
 					"message": "settings file does not exist",
-					"hint":    "run 'airbyte-agent login' to create ~/.airbyte-agent/settings.json",
+					"hint":    "run 'airbyte agents login' to create ~/.airbyte-cli/settings.json",
 				})
 				os.Exit(client.ExitNotFound)
 			}
@@ -156,7 +156,7 @@ func init() {
 	loginCmd.AddCommand(loginShowCmd)
 	loginCmd.Flags().BoolVar(&loginManualFlag, "manual", false, "Use the legacy prompt-based flow instead of the browser")
 	loginCmd.Flags().StringVar(&loginOrgIDFlag, "org-id", "", "Skip the multi-org picker by specifying the organization UUID")
-	rootCmd.AddCommand(loginCmd)
+	agentsCmd.AddCommand(loginCmd)
 }
 
 // runBrowserLogin opens the user's browser to Keycloak, exchanges the
@@ -166,7 +166,7 @@ func init() {
 // disk — the caller does that via mergePreservedSettings.
 func runBrowserLogin(ctx context.Context, p loginParams) (*auth.Settings, error) {
 	fmt.Fprintln(p.stderr, "Opening your browser to log in at app.airbyte.ai…")
-	fmt.Fprintln(p.stderr, "If the browser doesn't open, run `airbyte-agent login --manual`.")
+	fmt.Fprintln(p.stderr, "If the browser doesn't open, run `airbyte agents login --manual`.")
 
 	keycloakBase := os.Getenv("AIRBYTE_KEYCLOAK_URL")
 	if keycloakBase == "" {

@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
+	"github.com/airbytehq/airbyte-cli/internal/auth"
 )
 
 const (
@@ -88,7 +88,7 @@ func New(apiHost, organizationID, version string, tm *auth.TokenManager, opts ..
 	c := &Client{
 		apiHost:        apiHost,
 		organizationID: organizationID,
-		userAgent:      "airbyte-agent-cli/" + version,
+		userAgent:      "airbyte-cli/" + version,
 		version:        version,
 		tokenManager:   tm,
 		httpClient:     &http.Client{Timeout: requestTimeout},

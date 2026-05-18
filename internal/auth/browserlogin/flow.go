@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-agent-cli/internal/browser"
+	"github.com/airbytehq/airbyte-cli/internal/browser"
 )
 
 // Tokens is the result of a successful Keycloak login. Tokens are transient
