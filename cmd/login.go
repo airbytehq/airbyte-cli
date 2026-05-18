@@ -96,10 +96,10 @@ prompt for a workspace; if you need to change yours, edit
 
 		emitLoginTelemetry(start, merged.OrganizationID, true, "")
 
-		return outputpkg.WriteJSON(os.Stdout, map[string]string{
+		return outputpkg.Write(map[string]string{
 			"status":  "saved",
 			"message": "Settings written to ~/.airbyte-agent/settings.json",
-		})
+		}, output)
 	},
 }
 
@@ -129,12 +129,12 @@ shown here when the CLI actually makes API calls.`,
 			os.Exit(client.ExitGeneral)
 		}
 
-		return outputpkg.WriteJSON(os.Stdout, map[string]string{
+		return outputpkg.Write(map[string]string{
 			"client_id":       settings.Credentials.ClientID,
 			"client_secret":   obfuscateSecret(settings.Credentials.ClientSecret),
 			"organization_id": settings.OrganizationID,
 			"workspace":       settings.Workspace,
-		})
+		}, output)
 	},
 }
 
