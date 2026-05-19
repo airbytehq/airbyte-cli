@@ -90,3 +90,24 @@ type oauthSessionStatus struct {
 	SourceTemplateID string         `json:"source_template_id"`
 	AuthPayload      map[string]any `json:"auth_payload"`
 }
+
+// credentialsListResponse is the minimal projection of
+// GET /api/v1/organizations/{organization_id}/credentials used by
+// fetchAllCredentials. The endpoint returns a paginated envelope
+// `{ data, total }`; we ignore Total today (pagination is driven by page
+// size) but keep it on the struct so callers can inspect it if needed.
+//
+// CredentialsListItem has additional fields in sonar (workspace_id,
+// connector_name, last_accessed_at, context_store_badge_status, ...) that
+// the CLI does not consume — encoding/json silently ignores unknown fields,
+// so projecting just the three we care about here is intentional and safe.
+type credentialsListResponse struct {
+	Data  []credentialsListItem `json:"data"`
+	Total int                   `json:"total"`
+}
+
+type credentialsListItem struct {
+	ID                      string  `json:"id"`
+	ContextStoreStatus      *string `json:"context_store_status"`
+	ContextStoreEntityCount int     `json:"context_store_entity_count"`
+}

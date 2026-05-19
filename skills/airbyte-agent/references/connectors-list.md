@@ -18,6 +18,16 @@ airbyte-agent connectors list --json '{}'
 - Confirming a connector exists before calling `describe` or `execute`.
 - Discovering exact connector names to pass to other commands.
 - Checking the status of existing connectors.
+- Checking the context-store status of a connector (e.g. `loading`, `building`, `preview`, `ready`).
+
+## Response fields
+
+Each item under `data[]` carries the standard connector fields (`id`, `name`, `summarized_source_template`, `created_at`, `updated_at`) plus two enrichment fields merged in from the org credentials endpoint:
+
+- `context_store_status` (string|null) — current state of the connector's context store. Typical values include `loading`, `building`, `preview`, and `ready`. The field is `null` when no matching credential exists for the connector or when the enrichment lookup failed (see stderr notice below).
+- `context_store_entity_count` (int) — number of entities currently materialized in the context store. Defaults to `0` when no credential is found or on enrichment failure.
+
+If the org credentials lookup fails, the command still returns the connector list but emits a JSON notice on stderr similar to the workspace-fallback notice. Every item in that response carries `context_store_status: null` and `context_store_entity_count: 0`.
 
 ## Filtering output
 
@@ -27,6 +37,9 @@ airbyte-agent connectors list --fields data.id,data.name --json '{}'    # long f
 
 # Mixed top-level and row-level paths — use the long form for the row paths
 airbyte-agent connectors list --fields data.id,next --json '{}'
+
+# Just the context-store status per connector
+airbyte-agent connectors list --fields data.id,data.context_store_status --json '{}'
 ```
 
 ## Related commands
