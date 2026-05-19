@@ -1,6 +1,6 @@
 # airbyte-agent-cli
 
-A Go CLI for the Airbyte API, designed to be driven by both humans and AI agents.
+A Go CLI for the Airbyte Agent API, designed to be driven by both humans and AI agents.
 
 The CLI exposes Airbyte's resources (organizations, workspaces, connectors, etc.) as a uniform `airbyte-agent <resource> <operation>` interface. Every command supports JSON input/output, schema introspection via `airbyte-agent schema`, and structured JSON errors with stable exit codes — making it safe to script and easy for agents to discover at runtime.
 
