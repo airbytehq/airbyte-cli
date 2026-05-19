@@ -5,14 +5,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/airbytehq/airbyte-cli/cmd"
-	"github.com/airbytehq/airbyte-cli/internal/auth"
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/config"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
-	"github.com/airbytehq/airbyte-cli/internal/resources"
-	"github.com/airbytehq/airbyte-cli/internal/telemetry"
-	"github.com/airbytehq/airbyte-cli/internal/versioncheck"
+	"github.com/airbytehq/airbyte-agent-cli/cmd"
+	"github.com/airbytehq/airbyte-agent-cli/internal/auth"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/config"
+	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/resources"
+	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/versioncheck"
 )
 
 func main() {
@@ -59,7 +59,7 @@ func main() {
 
 	registry.SetTracker(t)
 	resources.RegisterAll()
-	registry.Build(cmd.GetAgentsCmd(), c, cmd.FlagAccessor())
+	registry.Build(cmd.GetRootCmd(), c, cmd.FlagAccessor())
 
 	err := cmd.Execute()
 	t.Flush()

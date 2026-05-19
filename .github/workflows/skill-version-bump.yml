@@ -3,7 +3,7 @@ name: skill-version-bump
 on:
   pull_request:
     paths:
-      - 'skills/airbyte-agents/**'
+      - 'skills/airbyte-agent/**'
 
 permissions:
   contents: read
@@ -27,12 +27,12 @@ jobs:
             echo "::notice::Head is v0.1.0 — treating as bootstrap/reset."
             exit 0
           fi
-          if ! base=$(git show "origin/${{ github.base_ref }}":skills/airbyte-agents/SKILL.md 2>/dev/null | ./scripts/skill-version.sh /dev/stdin 2>/dev/null); then
+          if ! base=$(git show "origin/${{ github.base_ref }}":skills/airbyte-agent/SKILL.md 2>/dev/null | ./scripts/skill-version.sh /dev/stdin 2>/dev/null); then
             echo "::notice::Base branch has no skill version yet — accepting head=$head as the bootstrap."
             exit 0
           fi
           if [ "$head" = "$base" ]; then
-            echo "::error::Skill version not bumped ($base unchanged). Bump skills/airbyte-agents/SKILL.md metadata.version."
+            echo "::error::Skill version not bumped ($base unchanged). Bump skills/airbyte-agent/SKILL.md metadata.version."
             exit 1
           fi
           greater=$(printf '%s\n%s\n' "$base" "$head" | sort -V | tail -1)

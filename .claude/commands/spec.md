@@ -92,7 +92,7 @@ options:
 
 | Signal | Domain |
 |--------|--------|
-| New `airbyte agents <noun> <verb>` command, new resource, new operation | **Resources** (`internal/resources/`) |
+| New `airbyte-agent <noun> <verb>` command, new resource, new operation | **Resources** (`internal/resources/`) |
 | Changes to registry building, flag generation, `--describe`, `--json`, validation | **Registry** (`internal/registry/`) |
 | HTTP retries, status codes, error mapping, new transport headers | **Client** (`internal/client/`) |
 | Credentials, OAuth, settings file, token caching | **Auth** (`internal/auth/`) |
@@ -119,13 +119,13 @@ options:
 Agent(subagent_type="Explore",
   description="Locate files for [feature area]",
   prompt="CONSTRAINT: READ-ONLY mode — do NOT create, modify, or delete any files.
-Find WHERE all files related to [feature area] live in the airbyte agents CLI.
+Find WHERE all files related to [feature area] live in the airbyte-agent CLI.
 Look in cmd/, internal/, skills/, api/. Return categorized list with file purposes.")
 
 Agent(subagent_type="general-purpose",
   description="Analyze [related feature]",
   prompt="CONSTRAINT: READ-ONLY mode — do NOT create, modify, or delete any files.
-Understand HOW [related feature] currently works in the airbyte agents CLI.
+Understand HOW [related feature] currently works in the airbyte-agent CLI.
 Read the implementation and document the patterns used. Include file:line references.
 Do NOT suggest improvements.")
 
@@ -277,7 +277,7 @@ domain: [resources | registry | client | auth | skills | output | telemetry | sc
 
 [2-3 sentence summary of what we're building and why.]
 
-**Recommended /implement mode**: standard (the airbyte agents CLI uses sequential phases — no team mode).
+**Recommended /implement mode**: standard (the airbyte-agent CLI uses sequential phases — no team mode).
 
 ### Constraints
 
@@ -329,7 +329,7 @@ go test ./internal/<package>/... -run <TestName> -v
 
 #### Manual Verification
 
-- [ ] [User-facing behavior to test by hand, e.g., "run `airbyte agents connectors describe --json '{...}'` against a real workspace"]
+- [ ] [User-facing behavior to test by hand, e.g., "run `airbyte-agent connectors describe --json '{...}'` against a real workspace"]
 
 ### Phase 2: [Phase Name]
 

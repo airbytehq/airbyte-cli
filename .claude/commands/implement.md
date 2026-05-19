@@ -292,7 +292,7 @@ Then report:
 - Confirm Final Verification passed (gofmt clean, vet clean, build green, full test suite green)
 - Confirm `internal/spec/extracted_gen.go` is up to date if `SpecRef` changed
 - List any remaining manual verification items from the plan
-- Offer to create a commit, run additional probe commands (e.g., `./airbyte agents <new-cmd> --describe`), or other next steps
+- Offer to create a commit, run additional probe commands (e.g., `./airbyte-agent <new-cmd> --describe`), or other next steps
 
 ## Important Guidelines
 

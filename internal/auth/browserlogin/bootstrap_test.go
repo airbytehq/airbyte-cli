@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 )
 
 // stubSonar builds an httptest.Server that dispatches sonar bootstrap endpoints

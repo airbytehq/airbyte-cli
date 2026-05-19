@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	"github.com/airbytehq/airbyte-cli/internal/telemetry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/telemetry"
 	analytics "github.com/segmentio/analytics-go/v3"
 )
 

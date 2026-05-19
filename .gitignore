@@ -1,5 +1,5 @@
 # Binaries
-/airbyte
+/airbyte-agent
 *.exe
 *.exe~
 *.dll
@@ -38,7 +38,7 @@ Thumbs.db
 .env
 .env.local
 .airbyte/
-.airbyte-cli/
+.airbyte-agent/
 credentials
 
 # Research and planning artifacts (used by /research, /spec, /implement)

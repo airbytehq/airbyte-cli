@@ -9,12 +9,12 @@ import (
 	"golang.org/x/term"
 )
 
-const splashLogo = ` █████╗ ██╗██████╗ ██████╗ ██╗   ██╗████████╗███████╗
-██╔══██╗██║██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝
-███████║██║██████╔╝██████╔╝ ╚████╔╝    ██║   █████╗
-██╔══██║██║██╔══██╗██╔══██╗  ╚██╔╝     ██║   ██╔══╝
-██║  ██║██║██║  ██║██████╔╝   ██║      ██║   ███████╗
-╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═════╝    ╚═╝      ╚═╝   ╚══════╝`
+const splashLogo = ` █████╗ ██╗██████╗ ██████╗ ██╗   ██╗████████╗███████╗      █████╗  ██████╗ ███████╗███╗   ██╗████████╗
+██╔══██╗██║██╔══██╗██╔══██╗╚██╗ ██╔╝╚══██╔══╝██╔════╝     ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝
+███████║██║██████╔╝██████╔╝ ╚████╔╝    ██║   █████╗   ██╗ ███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║
+██╔══██║██║██╔══██╗██╔══██╗  ╚██╔╝     ██║   ██╔══╝   ╚═╝ ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║
+██║  ██║██║██║  ██║██████╔╝   ██║      ██║   ███████╗     ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║
+╚═╝  ╚═╝╚═╝╚═╝  ╚═╝╚═════╝    ╚═╝      ╚═╝   ╚══════╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝`
 
 const splashTagline = "Command-line interface for the Airbyte platform"
 
@@ -25,27 +25,27 @@ type splashEntry struct {
 
 var splashGroups = [][]splashEntry{
 	{
-		{"airbyte agents login", "Authenticate and save credentials"},
-		{"airbyte agents help", "Show command usage instructions"},
+		{"airbyte-agent login", "Authenticate and save credentials"},
+		{"airbyte-agent help", "Show command usage instructions"},
 	},
 	{
-		{"airbyte agents connectors list", "List connectors in a workspace"},
-		{"airbyte agents connectors describe", "Inspect a connector's entities and actions"},
-		{"airbyte agents connectors execute", "Run an action against a connector entity"},
-		{"airbyte agents connectors create", "Install a new connector"},
-		{"airbyte agents connectors delete", "Remove a connector from a workspace"},
+		{"airbyte-agent connectors list", "List connectors in a workspace"},
+		{"airbyte-agent connectors describe", "Inspect a connector's entities and actions"},
+		{"airbyte-agent connectors execute", "Run an action against a connector entity"},
+		{"airbyte-agent connectors create", "Install a new connector"},
+		{"airbyte-agent connectors delete", "Remove a connector from a workspace"},
 	},
 	{
-		{"airbyte agents workspaces list", "List workspaces in your organization"},
-		{"airbyte agents workspaces use", "Set the default workspace"},
+		{"airbyte-agent workspaces list", "List workspaces in your organization"},
+		{"airbyte-agent workspaces use", "Set the default workspace"},
 	},
 	{
-		{"airbyte agents schema", "Print request/response schema for an operation"},
-		{"airbyte agents version", "Print the CLI version"},
+		{"airbyte-agent schema", "Print request/response schema for an operation"},
+		{"airbyte-agent version", "Print the CLI version"},
 	},
 }
 
-const splashTry = "airbyte agents login"
+const splashTry = "airbyte-agent login"
 
 func printSplash(w io.Writer) {
 	color := splashColors(w)
