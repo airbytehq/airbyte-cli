@@ -5,17 +5,17 @@ List the organizations that the authenticated principal has access to.
 ## Usage
 
 ```bash
-airbyte agents organizations list --json '{}'
+airbyte-agent organizations list --json '{}'
 ```
 
 ## Filtering output
 
 ```bash
-airbyte agents organizations list --fields id,organization_name --json '{}'              # short form
-airbyte agents organizations list --fields data.id,data.organization_name --json '{}'    # long form
+airbyte-agent organizations list --fields id,organization_name --json '{}'              # short form
+airbyte-agent organizations list --fields data.id,data.organization_name --json '{}'    # long form
 
 # Mixed top-level and row-level paths — use the long form for the row paths
-airbyte agents organizations list --fields data.id,next --json '{}'
+airbyte-agent organizations list --fields data.id,next --json '{}'
 ```
 
 ## When to use

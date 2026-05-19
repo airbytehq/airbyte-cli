@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
-	outputpkg "github.com/airbytehq/airbyte-cli/internal/output"
-	"github.com/airbytehq/airbyte-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
+	outputpkg "github.com/airbytehq/airbyte-agent-cli/internal/output"
+	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
 	"github.com/spf13/cobra"
 )
 
@@ -32,7 +32,7 @@ without making an API call.`,
 				if op.SpecRef.IsInternal() {
 					return writeSchemaError(
 						"not_supported",
-						fmt.Sprintf("no published schema for %q %q; run `airbyte agents %s %s --help` for argument details", resourceName, opName, resourceName, opName),
+						fmt.Sprintf("no published schema for %q %q; run `airbyte-agent %s %s --help` for argument details", resourceName, opName, resourceName, opName),
 						client.ExitNotFound,
 					)
 				}
@@ -44,7 +44,7 @@ without making an API call.`,
 }
 
 func init() {
-	agentsCmd.AddCommand(schemaCmd)
+	rootCmd.AddCommand(schemaCmd)
 }
 
 func writeSchemaError(errType, message string, exitCode int) error {

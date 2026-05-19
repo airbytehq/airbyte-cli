@@ -17,8 +17,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/airbytehq/airbyte-cli/internal/registry"
-	"github.com/airbytehq/airbyte-cli/internal/resources"
+	"github.com/airbytehq/airbyte-agent-cli/internal/registry"
+	"github.com/airbytehq/airbyte-agent-cli/internal/resources"
 )
 
 const (

@@ -11,7 +11,7 @@ import (
 func TestReadInstalledSkillVersion_ParsesMetadataVersion(t *testing.T) {
 	dir := t.TempDir()
 	writeSkill(t, dir, `---
-name: airbyte-agents
+name: airbyte-agent
 description: foo
 metadata:
   version: "v0.5.0"
@@ -33,7 +33,7 @@ metadata:
 func TestReadInstalledSkillVersion_UnquotedValue(t *testing.T) {
 	dir := t.TempDir()
 	writeSkill(t, dir, `---
-name: airbyte-agents
+name: airbyte-agent
 metadata:
   version: v0.5.0
 ---
@@ -49,7 +49,7 @@ metadata:
 func TestReadInstalledSkillVersion_MetadataPresentButNoVersion(t *testing.T) {
 	dir := t.TempDir()
 	writeSkill(t, dir, `---
-name: airbyte-agents
+name: airbyte-agent
 metadata:
   author: airbyte
 ---
@@ -83,7 +83,7 @@ func TestReadInstalledSkillVersion_FallsBackToHome(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv(skillDirEnv, "") // explicitly unset
 	writeSkillAt(t, filepath.Join(home, defaultSkillsDir, skillName, skillFileName), `---
-name: airbyte-agents
+name: airbyte-agent
 metadata:
   version: "v0.9.9"
 ---
@@ -139,7 +139,7 @@ func TestCheckSkill_OlderInstalledNudges(t *testing.T) {
 	if !strings.Contains(out, "v0.4.0") || !strings.Contains(out, "v0.5.0") {
 		t.Errorf("nudge missing versions: %q", out)
 	}
-	if !strings.Contains(out, "npx skills add airbytehq/airbyte-cli") {
+	if !strings.Contains(out, "npx skills add airbytehq/airbyte-agent-cli") {
 		t.Errorf("nudge missing npx skills command: %q", out)
 	}
 	if !strings.Contains(out, "https://airbyte.ai/install.sh") {
@@ -181,7 +181,7 @@ func seedSkill(t *testing.T, version string) {
 	t.Helper()
 	dir := t.TempDir()
 	t.Setenv(skillDirEnv, dir)
-	writeSkill(t, dir, "---\nname: airbyte-agents\nmetadata:\n  version: \""+version+"\"\n---\n")
+	writeSkill(t, dir, "---\nname: airbyte-agent\nmetadata:\n  version: \""+version+"\"\n---\n")
 }
 
 func writeSkill(t *testing.T, dir, body string) {

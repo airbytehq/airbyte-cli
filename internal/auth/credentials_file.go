@@ -8,13 +8,13 @@ import (
 )
 
 const (
-	settingsDirName  = ".airbyte-cli"
+	settingsDirName  = ".airbyte-agent"
 	settingsFileName = "settings.json"
 	settingsFileMode = 0o600
 	settingsDirMode  = 0o700
 )
 
-// settingsFile is the on-disk shape of ~/.airbyte-cli/settings.json:
+// settingsFile is the on-disk shape of ~/.airbyte-agent/settings.json:
 //
 //	{
 //	  "settings": {
@@ -63,7 +63,7 @@ func settingsPath() string {
 	return filepath.Join(home, settingsDirName, settingsFileName)
 }
 
-// ReadSettingsFile parses ~/.airbyte-cli/settings.json into a Settings value.
+// ReadSettingsFile parses ~/.airbyte-agent/settings.json into a Settings value.
 // Returns the underlying error (including os.ErrNotExist) so callers can
 // distinguish "no file" from "file is broken."
 func ReadSettingsFile() (*Settings, error) {
@@ -105,7 +105,7 @@ func ReadSettingsFile() (*Settings, error) {
 	}, nil
 }
 
-// WriteSettingsFile atomically writes ~/.airbyte-cli/settings.json with 0600
+// WriteSettingsFile atomically writes ~/.airbyte-agent/settings.json with 0600
 // permissions, creating the directory if needed.
 func WriteSettingsFile(s *Settings) error {
 	path := settingsPath()

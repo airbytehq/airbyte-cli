@@ -5,10 +5,10 @@ List the connectors that already exist in a given workspace.
 ## Usage
 
 ```bash
-airbyte agents connectors list --json '{"workspace": "my-workspace"}'
+airbyte-agent connectors list --json '{"workspace": "my-workspace"}'
 
 # workspace defaults to "default" when omitted
-airbyte agents connectors list --json '{}'
+airbyte-agent connectors list --json '{}'
 ```
 
 `workspace` is optional. If omitted, the command falls back to the workspace named `default` and prints a JSON notice on stderr — the API call still proceeds. To target a different workspace, set `"workspace": "<name>"` in the JSON payload.
@@ -22,11 +22,11 @@ airbyte agents connectors list --json '{}'
 ## Filtering output
 
 ```bash
-airbyte agents connectors list --fields id,name --json '{}'              # short form
-airbyte agents connectors list --fields data.id,data.name --json '{}'    # long form
+airbyte-agent connectors list --fields id,name --json '{}'              # short form
+airbyte-agent connectors list --fields data.id,data.name --json '{}'    # long form
 
 # Mixed top-level and row-level paths — use the long form for the row paths
-airbyte agents connectors list --fields data.id,next --json '{}'
+airbyte-agent connectors list --fields data.id,next --json '{}'
 ```
 
 ## Related commands

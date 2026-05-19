@@ -55,7 +55,7 @@ type Settings struct {
 // Resolution order:
 //  1. Environment variables (all three of AIRBYTE_CLIENT_ID,
 //     AIRBYTE_CLIENT_SECRET, AIRBYTE_ORGANIZATION_ID must be set).
-//  2. ~/.airbyte-cli/settings.json (all three fields must be populated).
+//  2. ~/.airbyte-agent/settings.json (all three fields must be populated).
 //  3. Error.
 func ResolveSettings() (*Settings, error) {
 	if s, ok := fromEnv(); ok {
@@ -68,7 +68,7 @@ func ResolveSettings() (*Settings, error) {
 		return nil, fmt.Errorf("settings file error: %w", err)
 	}
 
-	return nil, fmt.Errorf("no settings found: set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, and AIRBYTE_ORGANIZATION_ID environment variables, or create ~/.airbyte-cli/settings.json")
+	return nil, fmt.Errorf("no settings found: set AIRBYTE_CLIENT_ID, AIRBYTE_CLIENT_SECRET, and AIRBYTE_ORGANIZATION_ID environment variables, or create ~/.airbyte-agent/settings.json")
 }
 
 func fromEnv() (*Settings, bool) {

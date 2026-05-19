@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/airbytehq/airbyte-cli/internal/client"
+	"github.com/airbytehq/airbyte-agent-cli/internal/client"
 	"github.com/spf13/cobra"
 )
 
@@ -515,7 +515,7 @@ func TestNilClientReturnsAuthError(t *testing.T) {
 	}
 
 	hint, _ := result["hint"].(string)
-	for _, want := range []string{"airbyte agents login", "AIRBYTE_CLIENT_ID", "AIRBYTE_CLIENT_SECRET", "AIRBYTE_ORGANIZATION_ID", "~/.airbyte-cli/settings.json"} {
+	for _, want := range []string{"airbyte-agent login", "AIRBYTE_CLIENT_ID", "AIRBYTE_CLIENT_SECRET", "AIRBYTE_ORGANIZATION_ID", "~/.airbyte-agent/settings.json"} {
 		if !strings.Contains(hint, want) {
 			t.Errorf("expected hint to mention %q; got %q", want, hint)
 		}

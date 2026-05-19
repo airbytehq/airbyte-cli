@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install the airbyte CLI and its agent skills.
+# Install the airbyte-agent CLI and its agent skills.
 #
 # Usage:
 #   curl -fsSL airbyte.ai/install.sh | bash
@@ -15,8 +15,8 @@
 
 set -eu
 
-REPO="airbytehq/airbyte-cli"
-BINARY="airbyte"
+REPO="airbytehq/airbyte-agent-cli"
+BINARY="airbyte-agent"
 
 if [ -t 1 ]; then
   BOLD=$(printf '\033[1m'); RED=$(printf '\033[31m')
@@ -145,7 +145,7 @@ else
     if ! tar -xzf "$src_tarball" -C "$src_dir"; then
       warn "could not extract source tarball; skipping skills"
     else
-      # Tarball extracts to a single top-level dir like airbyte-cli-0.2.0
+      # Tarball extracts to a single top-level dir like airbyte-agent-cli-0.2.0
       skills_src=$(find "$src_dir" -mindepth 2 -maxdepth 2 -type d -name skills | head -n1)
       if [ -z "$skills_src" ] || [ ! -d "$skills_src" ]; then
         warn "no skills/ directory found in source tarball; skipping"
@@ -169,7 +169,7 @@ fi
 info ""
 case ":$PATH:" in
   *":$install_dir:"*)
-    info "Run ${BOLD}$BINARY agents login${RESET} to authenticate."
+    info "Run ${BOLD}$BINARY login${RESET} to authenticate."
     ;;
   *)
     warn "$install_dir is not on your PATH."
@@ -177,6 +177,6 @@ case ":$PATH:" in
     info ""
     info "    export PATH=\"$install_dir:\$PATH\""
     info ""
-    info "Then run ${BOLD}$BINARY agents login${RESET} to authenticate."
+    info "Then run ${BOLD}$BINARY login${RESET} to authenticate."
     ;;
 esac

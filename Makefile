@@ -3,15 +3,15 @@ COMMIT        ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DATE          ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 SKILL_VERSION ?= $(shell ./scripts/skill-version.sh 2>/dev/null || echo "dev")
 
-LDFLAGS = -X github.com/airbytehq/airbyte-cli/cmd.Version=$(VERSION) \
-          -X github.com/airbytehq/airbyte-cli/cmd.Commit=$(COMMIT) \
-          -X github.com/airbytehq/airbyte-cli/cmd.Date=$(DATE) \
-          -X github.com/airbytehq/airbyte-cli/cmd.ExpectedSkillVersion=$(SKILL_VERSION)
+LDFLAGS = -X github.com/airbytehq/airbyte-agent-cli/cmd.Version=$(VERSION) \
+          -X github.com/airbytehq/airbyte-agent-cli/cmd.Commit=$(COMMIT) \
+          -X github.com/airbytehq/airbyte-agent-cli/cmd.Date=$(DATE) \
+          -X github.com/airbytehq/airbyte-agent-cli/cmd.ExpectedSkillVersion=$(SKILL_VERSION)
 
 .PHONY: build generate test lint vet fmt check install clean
 
 build: generate
-	go build -ldflags "$(LDFLAGS)" -o airbyte .
+	go build -ldflags "$(LDFLAGS)" -o airbyte-agent .
 
 generate:
 	go generate ./...
@@ -36,4 +36,4 @@ install:
 	go install -ldflags "$(LDFLAGS)"
 
 clean:
-	rm -f airbyte
+	rm -f airbyte-agent
