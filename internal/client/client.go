@@ -65,6 +65,15 @@ func (c *Client) DefaultWorkspace() string {
 	return c.defaultWorkspace
 }
 
+// OrganizationID returns the configured organization ID, or "" if none was
+// set. Safe to call on a nil receiver (returns "").
+func (c *Client) OrganizationID() string {
+	if c == nil {
+		return ""
+	}
+	return c.organizationID
+}
+
 // WithAllowDestructive grants permission for destructive operations (e.g.
 // `connectors delete`) to run without prompting for interactive
 // confirmation. Sourced from `allow_destructive` in settings.json.

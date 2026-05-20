@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -220,15 +221,170 @@ func configuredDefaultWorkspace(c *client.Client) string {
 	return fallbackWorkspaceName
 }
 
+// credentialsPageSize is the per-page limit passed to the org-scoped
+// credentials list endpoint. 200 is large enough that most accounts get
+// everything in a single request while keeping each response payload
+// manageable.
+const credentialsPageSize = 200
+
+// credentialsMaxPages caps how many pages fetchAllCredentials will request
+// before giving up. At credentialsPageSize=200 this is a 10k-credential
+// ceiling — far above any plausible org size, so hitting it indicates a
+// pagination bug (e.g. the server stops decreasing the remaining count)
+// rather than a legitimate large account.
+const credentialsMaxPages = 50
+
+// fetchAllCredentials returns every credential in the caller's organization,
+// keyed by credential ID. It paginates GET
+// /api/v1/organizations/{organization_id}/credentials at limit=200 until a
+// short page (or empty page) is returned. Any non-2xx response from the API
+// or JSON decode failure is returned unwrapped — callers decide how to
+// surface partial fetch errors. The pagination loop is capped at
+// credentialsMaxPages defensively.
+//
+// This helper is pure data fetching: it does not mutate caller state and
+// does not feed into connectorsList's response handling.
+func fetchAllCredentials(ctx context.Context, c *client.Client) (map[string]credentialsListItem, error) {
+	orgID := c.OrganizationID()
+	path := "/api/v1/organizations/" + url.PathEscape(orgID) + "/credentials"
+
+	out := map[string]credentialsListItem{}
+	offset := 0
+	for page := 0; page < credentialsMaxPages; page++ {
+		raw, err := c.Get(ctx, path, map[string]string{
+			"limit":  strconv.Itoa(credentialsPageSize),
+			"offset": strconv.Itoa(offset),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var resp credentialsListResponse
+		if err := json.Unmarshal(raw, &resp); err != nil {
+			return nil, fmt.Errorf("parsing credentials list: %w", err)
+		}
+
+		for _, item := range resp.Data {
+			out[item.ID] = item
+		}
+
+		// Natural stop: a short page (including empty) means we've drained
+		// the server's data. The `total` field is informational only — the
+		// page length is the authoritative signal that no more data exists.
+		if len(resp.Data) < credentialsPageSize {
+			return out, nil
+		}
+
+		offset += credentialsPageSize
+	}
+
+	return nil, fmt.Errorf("fetchAllCredentials: pagination exceeded %d pages — likely a server pagination bug", credentialsMaxPages)
+}
+
+// connectorsList fans out the connectors-list and credentials-list calls in
+// parallel, then merges `context_store_status` + `context_store_entity_count`
+// into each connector item by `id`. The credentials call is best-effort: on
+// error, a JSON notice is written to statusWriter and the merge produces
+// `null` / `0` on every item instead of failing the whole request. This
+// keeps the primary listing usable even when the org credentials endpoint is
+// degraded.
+//
+// The parallel fan-out mirrors connectorsDescribe: each call runs in its
+// own goroutine, both report through a buffered channel, and a WaitGroup
+// joins before we read either result.
 func connectorsList(ctx context.Context, c *client.Client, params map[string]any) (any, error) {
 	workspaceName := applyDefaultWorkspace(c, params)
-	raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
-		"workspace_name": workspaceName,
-	})
-	if err != nil {
-		return nil, err
+
+	type connectorsResult struct {
+		data json.RawMessage
+		err  error
 	}
-	return raw, nil
+	type credentialsResult struct {
+		data map[string]credentialsListItem
+		err  error
+	}
+
+	var wg sync.WaitGroup
+	connectorsCh := make(chan connectorsResult, 1)
+	credentialsCh := make(chan credentialsResult, 1)
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		raw, err := c.Get(ctx, "/api/v1/integrations/connectors", map[string]string{
+			"workspace_name": workspaceName,
+		})
+		connectorsCh <- connectorsResult{raw, err}
+	}()
+	go func() {
+		defer wg.Done()
+		creds, err := fetchAllCredentials(ctx, c)
+		credentialsCh <- credentialsResult{creds, err}
+	}()
+	wg.Wait()
+
+	connRes := <-connectorsCh
+	credRes := <-credentialsCh
+
+	if connRes.err != nil {
+		return nil, connRes.err
+	}
+
+	// Soft-fail on credentials error: emit a stderr notice and use an empty
+	// map so the merge loop runs and stamps null/0 on every item.
+	creds := credRes.data
+	if credRes.err != nil {
+		notice, _ := json.Marshal(map[string]any{
+			"message":              fmt.Sprintf("context store status unavailable: %v", credRes.err),
+			"context_store_status": nil,
+		})
+		fmt.Fprintln(statusWriter, string(notice))
+		creds = map[string]credentialsListItem{}
+	}
+
+	// Defensive decode: if the envelope is missing `data` or is not the
+	// expected shape, return the raw response untouched plus a stderr
+	// notice. This mirrors the organizations.go envelope handling and
+	// keeps the command resilient to unexpected upstream payloads.
+	var connectors map[string]any
+	if err := json.Unmarshal(connRes.data, &connectors); err != nil {
+		notice, _ := json.Marshal(map[string]any{
+			"message":              fmt.Sprintf("context store status unavailable: connectors response not a JSON object: %v", err),
+			"context_store_status": nil,
+		})
+		fmt.Fprintln(statusWriter, string(notice))
+		return connRes.data, nil
+	}
+
+	data, ok := connectors["data"].([]any)
+	if !ok {
+		notice, _ := json.Marshal(map[string]any{
+			"message":              "context store status unavailable: connectors response missing data array",
+			"context_store_status": nil,
+		})
+		fmt.Fprintln(statusWriter, string(notice))
+		return connectors, nil
+	}
+
+	for _, item := range data {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		id, _ := entry["id"].(string)
+		cred, hasCred := creds[id]
+		if hasCred {
+			// ContextStoreStatus is a *string — nil serializes as JSON null,
+			// which is exactly what we want when the upstream reports null.
+			entry["context_store_status"] = cred.ContextStoreStatus
+			entry["context_store_entity_count"] = cred.ContextStoreEntityCount
+		} else {
+			entry["context_store_status"] = nil
+			entry["context_store_entity_count"] = 0
+		}
+	}
+
+	return connectors, nil
 }
 
 func connectorsListAvailable(ctx context.Context, c *client.Client, params map[string]any) (any, error) {

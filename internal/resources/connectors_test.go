@@ -300,14 +300,19 @@ func TestResolveConnectorID_Ambiguous(t *testing.T) {
 
 func TestConnectorsList(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/integrations/connectors" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
-		}
-		if r.URL.Query().Get("workspace_name") != "test-ws" {
-			t.Errorf("expected workspace_name=test-ws, got %s", r.URL.Query().Get("workspace_name"))
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data": [{"id": "c1", "name": "Connector 1"}]}`))
+		switch r.URL.Path {
+		case "/api/v1/integrations/connectors":
+			if r.URL.Query().Get("workspace_name") != "test-ws" {
+				t.Errorf("expected workspace_name=test-ws, got %s", r.URL.Query().Get("workspace_name"))
+			}
+			_, _ = w.Write([]byte(`{"data": [{"id": "c1", "name": "Connector 1"}]}`))
+		case "/api/v1/organizations/org-123/credentials":
+			_, _ = w.Write([]byte(`{"data": [], "total": 0}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer apiServer.Close()
 
@@ -319,14 +324,9 @@ func TestConnectorsList(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	raw, ok := result.(json.RawMessage)
+	parsed, ok := result.(map[string]any)
 	if !ok {
-		t.Fatalf("expected json.RawMessage, got %T", result)
-	}
-
-	var parsed map[string]any
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		t.Fatalf("parsing result: %v", err)
+		t.Fatalf("expected map[string]any, got %T", result)
 	}
 
 	data, ok := parsed["data"].([]any)
@@ -337,11 +337,19 @@ func TestConnectorsList(t *testing.T) {
 
 func TestConnectorsListDefaultsWorkspace(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if got := r.URL.Query().Get("workspace_name"); got != "default" {
-			t.Errorf("expected workspace_name=default, got %q", got)
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data": []}`))
+		switch r.URL.Path {
+		case "/api/v1/integrations/connectors":
+			if got := r.URL.Query().Get("workspace_name"); got != "default" {
+				t.Errorf("expected workspace_name=default, got %q", got)
+			}
+			_, _ = w.Write([]byte(`{"data": []}`))
+		case "/api/v1/organizations/org-123/credentials":
+			_, _ = w.Write([]byte(`{"data": [], "total": 0}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 	defer apiServer.Close()
 
@@ -357,15 +365,260 @@ func TestConnectorsListDefaultsWorkspace(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	// statusWriter may carry additional notices beyond the workspace
+	// fallback; locate the workspace notice line specifically.
 	var notice map[string]string
-	if err := json.Unmarshal(bytes.TrimSpace(stderr.Bytes()), &notice); err != nil {
-		t.Fatalf("expected JSON notice on stderr, got %q (err: %v)", stderr.String(), err)
+	for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
+		var candidate map[string]string
+		if err := json.Unmarshal([]byte(line), &candidate); err != nil {
+			continue
+		}
+		if _, ok := candidate["workspace"]; ok {
+			notice = candidate
+			break
+		}
+	}
+	if notice == nil {
+		t.Fatalf("expected JSON workspace-fallback notice on stderr, got %q", stderr.String())
 	}
 	if notice["workspace"] != "default" {
 		t.Errorf("expected workspace=default in notice, got %q", notice["workspace"])
 	}
 	if !strings.Contains(notice["message"], "falling back") {
 		t.Errorf("expected message to mention fallback, got %q", notice["message"])
+	}
+}
+
+func TestConnectorsListEnrichesContextStoreStatus(t *testing.T) {
+	// Three connectors + three matching credentials; assert every connector
+	// item carries the merged context_store_status / context_store_entity_count.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/integrations/connectors":
+			_, _ = w.Write([]byte(`{"data": [
+				{"id": "c1", "name": "Connector 1"},
+				{"id": "c2", "name": "Connector 2"},
+				{"id": "c3", "name": "Connector 3"}
+			]}`))
+		case "/api/v1/organizations/org-123/credentials":
+			_, _ = w.Write([]byte(`{"data": [
+				{"id": "c1", "context_store_status": "ready", "context_store_entity_count": 12},
+				{"id": "c2", "context_store_status": "building", "context_store_entity_count": 0},
+				{"id": "c3", "context_store_status": null, "context_store_entity_count": 0}
+			], "total": 3}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	result, err := connectorsList(context.Background(), c, map[string]any{"workspace": "test-ws"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Re-marshal + unmarshal so we observe the JSON form the user sees.
+	// The *string -> JSON null conversion happens during marshal, so the
+	// re-unmarshal gives us a clean nil to assert against.
+	buf, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshaling result: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(buf, &parsed); err != nil {
+		t.Fatalf("re-parsing result: %v", err)
+	}
+
+	data, ok := parsed["data"].([]any)
+	if !ok || len(data) != 3 {
+		t.Fatalf("expected 3 connectors, got %v", parsed["data"])
+	}
+
+	want := map[string]struct {
+		status      any
+		entityCount float64
+	}{
+		"c1": {status: "ready", entityCount: 12},
+		"c2": {status: "building", entityCount: 0},
+		"c3": {status: nil, entityCount: 0},
+	}
+
+	for _, raw := range data {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("expected connector entry to be an object, got %T", raw)
+		}
+		id, _ := entry["id"].(string)
+		expected, found := want[id]
+		if !found {
+			t.Errorf("unexpected connector id: %q", id)
+			continue
+		}
+		if entry["context_store_status"] != expected.status {
+			t.Errorf("connector %q context_store_status = %v (%T), want %v", id, entry["context_store_status"], entry["context_store_status"], expected.status)
+		}
+		if entry["context_store_entity_count"] != expected.entityCount {
+			t.Errorf("connector %q context_store_entity_count = %v, want %v", id, entry["context_store_entity_count"], expected.entityCount)
+		}
+		// Existing fields must survive the merge.
+		if _, ok := entry["name"]; !ok {
+			t.Errorf("connector %q lost 'name' during merge: %v", id, entry)
+		}
+	}
+}
+
+func TestConnectorsListSoftFailsOnCredentialsError(t *testing.T) {
+	// Credentials path returns 500; connectors path returns valid data. The
+	// merge must still emit each item with null/0 plus a JSON notice on
+	// stderr.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/integrations/connectors":
+			_, _ = w.Write([]byte(`{"data": [
+				{"id": "c1", "name": "Connector 1"},
+				{"id": "c2", "name": "Connector 2"}
+			]}`))
+		case "/api/v1/organizations/org-123/credentials":
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"detail": "credentials backend down"}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	var stderr bytes.Buffer
+	prev := statusWriter
+	statusWriter = &stderr
+	defer func() { statusWriter = prev }()
+
+	result, err := connectorsList(context.Background(), c, map[string]any{"workspace": "test-ws"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	buf, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshaling result: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(buf, &parsed); err != nil {
+		t.Fatalf("re-parsing result: %v", err)
+	}
+
+	data, ok := parsed["data"].([]any)
+	if !ok || len(data) != 2 {
+		t.Fatalf("expected 2 connectors, got %v", parsed["data"])
+	}
+	for _, raw := range data {
+		entry, ok := raw.(map[string]any)
+		if !ok {
+			t.Fatalf("connector entry not a map: %T", raw)
+		}
+		if entry["context_store_status"] != nil {
+			t.Errorf("expected null context_store_status on soft-fail, got %v", entry["context_store_status"])
+		}
+		if entry["context_store_entity_count"] != float64(0) {
+			t.Errorf("expected context_store_entity_count=0 on soft-fail, got %v", entry["context_store_entity_count"])
+		}
+	}
+
+	// Locate the soft-fail notice on stderr — be tolerant of other notices.
+	var foundNotice bool
+	for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
+		var notice map[string]any
+		if err := json.Unmarshal([]byte(line), &notice); err != nil {
+			continue
+		}
+		msg, _ := notice["message"].(string)
+		if strings.Contains(msg, "context store status unavailable") {
+			foundNotice = true
+			if _, ok := notice["context_store_status"]; !ok {
+				t.Errorf("soft-fail notice missing context_store_status key: %v", notice)
+			}
+			break
+		}
+	}
+	if !foundNotice {
+		t.Errorf("expected soft-fail notice on stderr, got %q", stderr.String())
+	}
+}
+
+func TestConnectorsListHandlesNoMatchingCredential(t *testing.T) {
+	// Two connectors, only one matching credential. The unmatched connector
+	// must get null / 0; the matched one keeps its real values.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/api/v1/integrations/connectors":
+			_, _ = w.Write([]byte(`{"data": [
+				{"id": "c1", "name": "Has Credential"},
+				{"id": "c2", "name": "No Credential"}
+			]}`))
+		case "/api/v1/organizations/org-123/credentials":
+			_, _ = w.Write([]byte(`{"data": [
+				{"id": "c1", "context_store_status": "ready", "context_store_entity_count": 5}
+			], "total": 1}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	result, err := connectorsList(context.Background(), c, map[string]any{"workspace": "test-ws"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	buf, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshaling result: %v", err)
+	}
+	var parsed map[string]any
+	if err := json.Unmarshal(buf, &parsed); err != nil {
+		t.Fatalf("re-parsing result: %v", err)
+	}
+
+	data, ok := parsed["data"].([]any)
+	if !ok || len(data) != 2 {
+		t.Fatalf("expected 2 connectors, got %v", parsed["data"])
+	}
+
+	byID := map[string]map[string]any{}
+	for _, raw := range data {
+		entry, _ := raw.(map[string]any)
+		id, _ := entry["id"].(string)
+		byID[id] = entry
+	}
+
+	c1 := byID["c1"]
+	if c1["context_store_status"] != "ready" {
+		t.Errorf("c1 expected status=ready, got %v", c1["context_store_status"])
+	}
+	if c1["context_store_entity_count"] != float64(5) {
+		t.Errorf("c1 expected entity_count=5, got %v", c1["context_store_entity_count"])
+	}
+
+	c2 := byID["c2"]
+	if c2["context_store_status"] != nil {
+		t.Errorf("c2 expected null status, got %v", c2["context_store_status"])
+	}
+	if c2["context_store_entity_count"] != float64(0) {
+		t.Errorf("c2 expected entity_count=0, got %v", c2["context_store_entity_count"])
 	}
 }
 
@@ -716,6 +969,167 @@ func TestConnectorsDescribeReturnsSchemaError(t *testing.T) {
 	apiErr, ok := err.(*client.APIError)
 	if !ok {
 		t.Fatalf("expected *client.APIError, got %T", err)
+	}
+	if apiErr.StatusCode != http.StatusInternalServerError {
+		t.Errorf("expected status 500, got %d", apiErr.StatusCode)
+	}
+}
+
+func TestFetchAllCredentialsSinglePage(t *testing.T) {
+	// 5 items + total=5 < limit=200 → loop terminates after one request.
+	var requests []string
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/organizations/org-123/credentials" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		requests = append(requests, r.URL.Query().Get("offset"))
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"data": [
+				{"id": "cred-1", "context_store_status": "indexed", "context_store_entity_count": 3},
+				{"id": "cred-2", "context_store_status": null, "context_store_entity_count": 0},
+				{"id": "cred-3", "context_store_status": "indexing", "context_store_entity_count": 1},
+				{"id": "cred-4", "context_store_status": "indexed", "context_store_entity_count": 7},
+				{"id": "cred-5", "context_store_status": "failed", "context_store_entity_count": 0}
+			],
+			"total": 5
+		}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	got, err := fetchAllCredentials(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(requests) != 1 {
+		t.Errorf("expected 1 request, got %d (%v)", len(requests), requests)
+	}
+	if len(requests) > 0 && requests[0] != "0" {
+		t.Errorf("expected first offset=0, got %q", requests[0])
+	}
+	if len(got) != 5 {
+		t.Errorf("expected 5 credentials, got %d", len(got))
+	}
+
+	item, ok := got["cred-1"]
+	if !ok {
+		t.Fatalf("expected cred-1 in result, got keys %v", got)
+	}
+	if item.ContextStoreStatus == nil || *item.ContextStoreStatus != "indexed" {
+		t.Errorf("cred-1 context_store_status mismatch: %v", item.ContextStoreStatus)
+	}
+	if item.ContextStoreEntityCount != 3 {
+		t.Errorf("cred-1 entity count = %d, want 3", item.ContextStoreEntityCount)
+	}
+
+	// Verify null context_store_status decodes as a nil pointer.
+	cred2, ok := got["cred-2"]
+	if !ok {
+		t.Fatalf("expected cred-2 in result")
+	}
+	if cred2.ContextStoreStatus != nil {
+		t.Errorf("cred-2 expected nil context_store_status, got %v", *cred2.ContextStoreStatus)
+	}
+}
+
+func TestFetchAllCredentialsPaginates(t *testing.T) {
+	// Pages return 200, 200, 100 items. Successive calls should pass
+	// offset=0, 200, 400. The final short page (100 < 200) terminates the
+	// loop without an extra request.
+	var requests []string
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/organizations/org-123/credentials" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		offset := r.URL.Query().Get("offset")
+		requests = append(requests, offset)
+
+		w.Header().Set("Content-Type", "application/json")
+		var start, count int
+		switch offset {
+		case "0":
+			start, count = 0, 200
+		case "200":
+			start, count = 200, 200
+		case "400":
+			start, count = 400, 100
+		default:
+			t.Errorf("unexpected offset: %s", offset)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		var b bytes.Buffer
+		b.WriteString(`{"data":[`)
+		for i := 0; i < count; i++ {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			fmt.Fprintf(&b, `{"id":"cred-%d","context_store_status":"indexed","context_store_entity_count":%d}`, start+i, i)
+		}
+		b.WriteString(`],"total":500}`)
+		_, _ = w.Write(b.Bytes())
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	got, err := fetchAllCredentials(context.Background(), c)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(requests) != 3 {
+		t.Fatalf("expected 3 requests, got %d (%v)", len(requests), requests)
+	}
+	wantOffsets := []string{"0", "200", "400"}
+	for i, want := range wantOffsets {
+		if requests[i] != want {
+			t.Errorf("request[%d] offset = %q, want %q", i, requests[i], want)
+		}
+	}
+
+	if len(got) != 500 {
+		t.Errorf("expected 500 credentials, got %d", len(got))
+	}
+	if _, ok := got["cred-0"]; !ok {
+		t.Error("expected cred-0 from first page")
+	}
+	if _, ok := got["cred-200"]; !ok {
+		t.Error("expected cred-200 from second page")
+	}
+	if _, ok := got["cred-499"]; !ok {
+		t.Error("expected cred-499 from third page")
+	}
+}
+
+func TestFetchAllCredentialsAPIError(t *testing.T) {
+	// A 500 on the first call must surface as an APIError without partial
+	// data — the helper does no retries beyond what client.Get itself does.
+	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"detail": "credentials list failed"}`))
+	}))
+	defer apiServer.Close()
+
+	c, cleanup := newTestClient(t, apiServer)
+	defer cleanup()
+
+	got, err := fetchAllCredentials(context.Background(), c)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if got != nil {
+		t.Errorf("expected nil map on error, got %v", got)
+	}
+	apiErr, ok := err.(*client.APIError)
+	if !ok {
+		t.Fatalf("expected *client.APIError unwrapped, got %T", err)
 	}
 	if apiErr.StatusCode != http.StatusInternalServerError {
 		t.Errorf("expected status 500, got %d", apiErr.StatusCode)
