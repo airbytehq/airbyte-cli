@@ -3027,7 +3027,7 @@
           "Workspaces"
         ],
         "summary": "Get Workspace Stats",
-        "description": "Get external user statistics for the authenticated organization.\n\nReturns the count of active and inactive external users.",
+        "description": "Get workspace statistics for the authenticated organization.\n\nReturns the count of active and inactive workspaces.",
         "operationId": "get_workspaces_stats",
         "security": [
           {
@@ -3108,7 +3108,7 @@
           "Workspaces"
         ],
         "summary": "Get Workspace",
-        "description": "Get a single external user by ID.",
+        "description": "Get a single workspace by ID.",
         "operationId": "get_workspaces_workspace_id",
         "security": [
           {
@@ -3197,7 +3197,7 @@
           "Workspaces"
         ],
         "summary": "Update Workspace",
-        "description": "Update an external user's name, status, and/or cache setting.\n- Set `name` to update the external user name\n- Set `status` to 'active' or 'inactive' to change the external user status\n- When setting status to 'inactive', all active connections for the external user will be automatically disabled\n- Set `cache_enabled` to true/false to enable or disable Context Store caching for this external user",
+        "description": "Update a workspace's name, status, and/or cache setting.\n- Set `name` to update the workspace name\n- Set `status` to 'active' or 'inactive' to change the workspace status\n- When setting status to 'inactive', all active connections for the workspace will be automatically disabled\n- Set `cache_enabled` to true/false to enable or disable Context Store caching for this workspace",
         "operationId": "update_workspaces_workspace_id",
         "security": [
           {
@@ -3296,7 +3296,7 @@
           "Workspaces"
         ],
         "summary": "Delete Workspace",
-        "description": "Delete an external user. Removes the external user from the Data Replication Platform and soft-deletes locally.",
+        "description": "Delete a workspace. Removes the workspace from the Data Replication Platform and soft-deletes locally.",
         "operationId": "delete_workspaces_workspace_id",
         "security": [
           {
@@ -7005,13 +7005,13 @@
             "type": "string",
             "format": "uuid",
             "title": "Id",
-            "description": "Unique identifier of the deleted external user"
+            "description": "Unique identifier of the deleted workspace"
           },
           "deleted_at": {
             "type": "string",
             "format": "date-time",
             "title": "Deleted At",
-            "description": "Timestamp when the external user was deleted"
+            "description": "Timestamp when the workspace was deleted"
           }
         },
         "type": "object",
@@ -7027,22 +7027,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Id",
-            "description": "Unique identifier for the external user"
+            "description": "Unique identifier for the workspace"
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Name of the external user"
+            "description": "Name of the workspace"
           },
           "organization_id": {
             "type": "string",
             "format": "uuid",
             "title": "Organization Id",
-            "description": "Organization that owns this external user"
+            "description": "Organization that owns this workspace"
           },
           "status": {
             "$ref": "#/components/schemas/WorkspaceStatus",
-            "description": "The status of the external user (active or inactive)"
+            "description": "The status of the workspace (active or inactive)"
           },
           "cache_enabled": {
             "anyOf": [
@@ -7059,19 +7059,19 @@
           "tombstone": {
             "type": "boolean",
             "title": "Tombstone",
-            "description": "Whether this external user has been deleted"
+            "description": "Whether this workspace has been deleted"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Timestamp when the external user was created"
+            "description": "Timestamp when the workspace was created"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Timestamp when the external user was last updated"
+            "description": "Timestamp when the workspace was last updated"
           }
         },
         "type": "object",
@@ -7093,22 +7093,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Id",
-            "description": "Unique identifier for the external user"
+            "description": "Unique identifier for the workspace"
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Name of the external user"
+            "description": "Name of the workspace"
           },
           "organization_id": {
             "type": "string",
             "format": "uuid",
             "title": "Organization Id",
-            "description": "Organization that owns this external user"
+            "description": "Organization that owns this workspace"
           },
           "status": {
             "$ref": "#/components/schemas/WorkspaceStatus",
-            "description": "The status of the external user (active or inactive)"
+            "description": "The status of the workspace (active or inactive)"
           },
           "cache_enabled": {
             "anyOf": [
@@ -7125,19 +7125,19 @@
           "tombstone": {
             "type": "boolean",
             "title": "Tombstone",
-            "description": "Whether this external user has been deleted"
+            "description": "Whether this workspace has been deleted"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Timestamp when the external user was created"
+            "description": "Timestamp when the workspace was created"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Timestamp when the external user was last updated"
+            "description": "Timestamp when the workspace was last updated"
           }
         },
         "type": "object",
@@ -7187,17 +7187,17 @@
           "active_count": {
             "type": "integer",
             "title": "Active Count",
-            "description": "Number of active external users"
+            "description": "Number of active workspaces"
           },
           "inactive_count": {
             "type": "integer",
             "title": "Inactive Count",
-            "description": "Number of inactive external users"
+            "description": "Number of inactive workspaces"
           },
           "total_count": {
             "type": "integer",
             "title": "Total Count",
-            "description": "Total number of external users"
+            "description": "Total number of workspaces"
           }
         },
         "type": "object",
@@ -7228,7 +7228,7 @@
               }
             ],
             "title": "Name",
-            "description": "New name for the external user"
+            "description": "New name for the workspace"
           },
           "status": {
             "anyOf": [
@@ -7263,22 +7263,22 @@
             "type": "string",
             "format": "uuid",
             "title": "Id",
-            "description": "Unique identifier for the external user"
+            "description": "Unique identifier for the workspace"
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Name of the external user"
+            "description": "Name of the workspace"
           },
           "organization_id": {
             "type": "string",
             "format": "uuid",
             "title": "Organization Id",
-            "description": "Organization that owns this external user"
+            "description": "Organization that owns this workspace"
           },
           "status": {
             "$ref": "#/components/schemas/WorkspaceStatus",
-            "description": "The status of the external user (active or inactive)"
+            "description": "The status of the workspace (active or inactive)"
           },
           "cache_enabled": {
             "anyOf": [
@@ -7295,19 +7295,19 @@
           "tombstone": {
             "type": "boolean",
             "title": "Tombstone",
-            "description": "Whether this external user has been deleted"
+            "description": "Whether this workspace has been deleted"
           },
           "created_at": {
             "type": "string",
             "format": "date-time",
             "title": "Created At",
-            "description": "Timestamp when the external user was created"
+            "description": "Timestamp when the workspace was created"
           },
           "updated_at": {
             "type": "string",
             "format": "date-time",
             "title": "Updated At",
-            "description": "Timestamp when the external user was last updated"
+            "description": "Timestamp when the workspace was last updated"
           }
         },
         "type": "object",
