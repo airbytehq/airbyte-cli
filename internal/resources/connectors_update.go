@@ -103,13 +103,21 @@ var confirmOpenBrowser = func(message, url string) bool {
 	fmt.Fprintln(confirmWriter, message)
 	fmt.Fprintf(confirmWriter, "Open %s in your browser? Type 'yes' to confirm (skips after %s): ", url, confirmOpenBrowserTimeout)
 
+	// Capture the reader into a local before spawning the goroutine. The
+	// goroutine outlives this function call (it stays blocked on Read until
+	// the process exits or input arrives), so reading the package-level
+	// `confirmReader` from inside the goroutine would race with tests that
+	// restore the var in a deferred cleanup. The local capture establishes
+	// a happens-before edge that's safe for the race detector.
+	reader := confirmReader
+
 	type readResult struct {
 		line string
 		err  error
 	}
 	ch := make(chan readResult, 1)
 	go func() {
-		line, err := bufio.NewReader(confirmReader).ReadString('\n')
+		line, err := bufio.NewReader(reader).ReadString('\n')
 		ch <- readResult{line: line, err: err}
 	}()
 
