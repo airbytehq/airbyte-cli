@@ -23,6 +23,7 @@ func (cr *connectorsResource) Description() string { return "Create, manage, and
 func (cr *connectorsResource) Operations() []registry.Operation {
 	return []registry.Operation{
 		connectorsCreateOperation(),
+		connectorsUpdateOperation(),
 		{
 			Name:        "list",
 			Description: "List connectors in a workspace",

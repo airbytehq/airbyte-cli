@@ -1142,6 +1142,7 @@ func TestConnectorsResourceOperations(t *testing.T) {
 
 	expected := map[string]bool{
 		"create":         false,
+		"update":         false,
 		"list":           false,
 		"list-available": false,
 		"describe":       false,

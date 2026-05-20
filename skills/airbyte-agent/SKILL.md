@@ -44,6 +44,7 @@ Each row points to the per-command playbook with usage, workflows, error recover
 | Run an action (list/get/search/create/update) against connector data — **the workhorse** | [`references/connectors-execute.md`](references/connectors-execute.md) |
 | Discover a connector's entities, actions, params, and field schemas | [`references/connectors-describe.md`](references/connectors-describe.md) |
 | Install a new connector via the browser credential flow | [`references/connectors-create.md`](references/connectors-create.md) |
+| Re-enter or fix credentials for an existing connector via the browser | [`references/connectors-update.md`](references/connectors-update.md) |
 | Delete a connector (destructive — confirm first) | [`references/connectors-delete.md`](references/connectors-delete.md) |
 | List connectors configured in a workspace | [`references/connectors-list.md`](references/connectors-list.md) |
 | List connector templates available to install | [`references/connectors-list-available.md`](references/connectors-list-available.md) |
