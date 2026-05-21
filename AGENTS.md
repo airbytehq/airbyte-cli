@@ -98,6 +98,7 @@ The CLI uses a **resource-registry** pattern:
 | `connectors` | `describe` | Get connector details + schema | `name`+`workspace` or `--id` |
 | `connectors` | `execute` | Execute a connector action | `name`+`workspace` or `--id`, `entity`, `action`, `params` |
 | `connectors` | `create` | Interactive credential flow | `workspace`, `name` (template) or `id` (template ID) |
+| `connectors` | `update` | Open the browser to edit a connector's credentials | `name`+`workspace` or `--id` |
 | `connectors` | `delete` | Delete a connector | `name`+`workspace` or `--id` |
 
 ### Common Flags

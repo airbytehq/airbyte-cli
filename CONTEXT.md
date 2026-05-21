@@ -135,7 +135,16 @@ airbyte-agent connectors create --json '{
 }'
 ```
 
-### 5. Deleting a Connector
+### 5. Updating Connector Credentials
+
+```bash
+# Open the credentials page in your browser to edit an existing connector
+airbyte-agent connectors update --json '{"workspace": "my-workspace", "name": "my-source"}'
+```
+
+The CLI resolves the connector, prints the action message + a `Type 'yes' to confirm (skips after 10s)` prompt, and opens your browser to `<webapp>/organizations/<org_id>/credentials` only if you type `yes` within the timeout. Any other input — `no`, empty line, EOF, or the timeout firing — skips the browser open. The result on stdout always includes `url`, `connector_id`, `message`, and `browser_opened: bool`, so non-interactive callers (MCP, CI, piped subprocesses) get the URL even when the prompt is skipped. Honors `AIRBYTE_WEBAPP_URL` for non-prod environments.
+
+### 6. Deleting a Connector
 
 ```bash
 airbyte-agent connectors delete --json '{"workspace": "my-workspace", "name": "old-source"}'
@@ -143,7 +152,7 @@ airbyte-agent connectors delete --json '{"workspace": "my-workspace", "name": "o
 
 Delete is destructive and prompts for an interactive `"Type 'yes' to confirm:"` on a TTY. Without a TTY (e.g. piped agent input), the command refuses with a `validation_error` whose hint tells you to set `"allow_destructive": true` in `~/.airbyte-agent/settings.json` (or `AIRBYTE_ALLOW_DESTRUCTIVE=true`). Once that permission is granted, the prompt is skipped.
 
-### 6. Schema Introspection
+### 7. Schema Introspection
 
 Use the top-level `schema` command to see an operation's parameter schema (and underlying OpenAPI request/response) before calling it:
 
@@ -164,7 +173,7 @@ airbyte-agent schema connectors execute
 # }
 ```
 
-### 7. Loading Parameters from a File
+### 8. Loading Parameters from a File
 
 For complex JSON payloads, use `@filename`:
 
