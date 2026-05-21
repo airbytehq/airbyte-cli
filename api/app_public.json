@@ -4971,6 +4971,11 @@
             "$ref": "#/components/schemas/SourceConfigTemplateMode",
             "default": "REPLICATION"
           },
+          "is_experimental": {
+            "type": "boolean",
+            "title": "Is Experimental",
+            "default": false
+          },
           "created_at": {
             "anyOf": [
               {
@@ -5953,6 +5958,11 @@
             "$ref": "#/components/schemas/SourceConfigTemplateMode",
             "default": "REPLICATION"
           },
+          "is_experimental": {
+            "type": "boolean",
+            "title": "Is Experimental",
+            "default": false
+          },
           "created_at": {
             "anyOf": [
               {
@@ -6228,6 +6238,11 @@
           "mode": {
             "$ref": "#/components/schemas/SourceConfigTemplateMode",
             "default": "REPLICATION"
+          },
+          "is_experimental": {
+            "type": "boolean",
+            "title": "Is Experimental",
+            "default": false
           },
           "created_at": {
             "anyOf": [
@@ -6537,6 +6552,11 @@
           "mode": {
             "$ref": "#/components/schemas/SourceConfigTemplateMode",
             "default": "REPLICATION"
+          },
+          "is_experimental": {
+            "type": "boolean",
+            "title": "Is Experimental",
+            "default": false
           },
           "created_at": {
             "anyOf": [
